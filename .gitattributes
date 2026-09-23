@@ -1,0 +1,16 @@
+# Set default behavior to automatically normalize text file line endings to LF
+* text=auto eol=lf
+
+# Explicit text file formats
+*.m text
+*.md text
+*.txt text
+
+# Binary formats that should never be modified by line ending conversion
+*.mat binary
+*.mlx binary
+*.pdf binary
+*.png binary
+*.jpg binary
+*.emf binary
+*.pptx binary

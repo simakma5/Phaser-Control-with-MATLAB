@@ -1,0 +1,10 @@
+taper_angle = angle(taper)*180/pi; 
+taper_amp = 20*log10(abs(taper)); 
+bit=2; 
+amp_lsb=8; 
+phase_lsb=360/2^bit; 
+taper_angle = round(taper_angle / phase_lsb) * phase_lsb; 
+taper_amp = round(taper_amp / amp_lsb) * amp_lsb; 
+taper_amp = 10.^(taper_amp/20); 
+taper_angle = taper_angle/180*pi; 
+taper = taper_amp.*exp(1i*taper_angle); 

@@ -1,0 +1,12 @@
+digitalWeights = ai.DigitalWeights; 
+
+digital_steer = 20; 
+u_steer = sind(digital_steer);
+lambda = 3e8 / 10e9; 
+dx = 2*lambda; 
+k = 2*pi/lambda; 
+steer_vec = [1; exp(1j*k*u_steer*dx)]; 
+
+
+digitalWeights_update = digitalWeights.*steer_vec; 
+ai.updateDigitalWeights(digitalWeights_update);
