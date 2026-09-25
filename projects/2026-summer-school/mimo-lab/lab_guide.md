@@ -98,6 +98,8 @@ For each Tx:
 2. Verify settings in `mimo_lab.m`:
    ```matlab
    arrayMode       = '2x8_switched'; % Full 16-element contiguous virtual ULA
+   dTx_lambda      = 4.0;            % Tx separation in lambda (1.0: overlapped, 4.0: contiguous ULA)
+   targetCount     = 2;              % Number of targets to lock and simulate
    calRange        = 1.6;            % Range calibration offset in meters
    targetRangeGate = [0.5, 5.0];     % Target search interval in meters
    ```

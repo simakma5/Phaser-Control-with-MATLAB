@@ -28,6 +28,8 @@ addpath(genpath(fullfile(repoRoot, 'demos')));
 % =========================================================================
 % [LIVE SCRIPT CONTROLS TO CONFIGURE]:
 %   arrayMode     -> Drop-Down: ["2x8_switched", "2x2_subarray"]
+%   dTx_lambda    -> Numeric Edit Field: e.g. 4.0 (1.0 for overlapped, 4.0 for contiguous ULA)
+%   targetCount   -> Numeric Edit Field: integer >= 1 (default: 2)
 %   spatialWindow -> Drop-Down: ["Uniform", "Hann", "Chebyshev"]
 %   sllChebDb     -> Slider / Numeric: [-40, -15] step 1 (default: -25)
 %   tx_phase_cal  -> Slider: [-180, 180] step 5 (default: 0.0)
@@ -37,6 +39,14 @@ addpath(genpath(fullfile(repoRoot, 'demos')));
 
 % Array Mode: '2x8_switched' (16-element virtual ULA) or '2x2_subarray' (4-channel baseline)
 arrayMode = '2x8_switched';
+
+% Transmit antenna separation in wavelengths (lambda)
+%   1.0 -> Overlapped array bracket
+%   4.0 -> Non-overlapped contiguous linear array bracket (default)
+dTx_lambda = 4.0;
+
+% Target count for automated peak locking and theoretical simulation (default: 2)
+targetCount = 2;
 
 % Spatial tapering / windowing across array elements
 spatialWindow = 'Uniform';   % Options: 'Uniform', 'Hann', 'Chebyshev'
@@ -62,12 +72,13 @@ speedResolution = 1/2;       % Speed resolution for chirp count (m/s)
 % Array Geometry Setup
 nRxPhysical = 8;
 dRx = lambda / 2;
-dTx = 4 * lambda;            % 8 * dRx
+dTx = dTx_lambda * lambda;
 
 arrayParams = struct();
 arrayParams.x_rx        = (0:(nRxPhysical - 1)) * dRx;
 arrayParams.x_tx        = [0, dTx];
-arrayParams.x_virt      = (0:(2 * nRxPhysical - 1)) * dRx;
+arrayParams.x_virt      = [arrayParams.x_rx, arrayParams.x_rx + dTx];
+arrayParams.dTx_lambda  = dTx_lambda;
 arrayParams.lambda      = lambda;
 arrayParams.arrayMode   = arrayMode;
 
@@ -106,6 +117,7 @@ doaParams.azimuthGrid   = -60:0.5:60;
 doaParams.tx_phase_cal  = tx_phase_cal;
 doaParams.spatialWindow = spatialWindow;
 doaParams.sllChebDb     = sllChebDb;
+doaParams.targetCount   = targetCount;
 
 spatialResults = calculateMimoSpatialSpectrum( ...
     rangeResults, arrayParams, doaParams);

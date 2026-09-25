@@ -30,9 +30,11 @@ function spatialResults = calculateMimoSpatialSpectrum(rangeResults, arrayParams
     if ~isfield(doaParams, 'doaAlgorithm'),  doaParams.doaAlgorithm = 'Bartlett'; end
     if ~isfield(doaParams, 'spatialWindow'), doaParams.spatialWindow = 'Uniform'; end
     if ~isfield(doaParams, 'sllChebDb'),     doaParams.sllChebDb = -25; end
+    if ~isfield(doaParams, 'targetCount'),   doaParams.targetCount = 2; end
 
     azimuthGrid  = doaParams.azimuthGrid;
     tx_phase_cal = doaParams.tx_phase_cal;
+    targetCount  = doaParams.targetCount;
     targetBin    = rangeResults.targetBin;
     meanRangeSpectrum = rangeResults.meanRangeSpectrum;
 
@@ -76,7 +78,7 @@ function spatialResults = calculateMimoSpatialSpectrum(rangeResults, arrayParams
             P_virt_meas_db = norm_db(P_virt_meas);
 
             % Automatic AOA Detection from measured 16-element virtual spectrum
-            [detectedAOAs, detectedPowers] = findSpatialPeaks(P_virt_meas_db, azimuthGrid, 2, 3.0);
+            [detectedAOAs, detectedPowers] = findSpatialPeaks(P_virt_meas_db, azimuthGrid, targetCount, 3.0);
 
         case '2x2_subarray'
             H_sub = squeeze(meanRangeSpectrum(targetBin, :, :)); % 2 Rx x 2 Tx
@@ -101,7 +103,7 @@ function spatialResults = calculateMimoSpatialSpectrum(rangeResults, arrayParams
             P_virt_meas_db = norm_db(P_virt_meas);
             P_rx_meas_db = P_virt_meas_db;
 
-            [detectedAOAs, detectedPowers] = findSpatialPeaks(P_virt_meas_db, azimuthGrid, 2, 3.0);
+            [detectedAOAs, detectedPowers] = findSpatialPeaks(P_virt_meas_db, azimuthGrid, targetCount, 3.0);
     end
 
     if isempty(detectedAOAs)
