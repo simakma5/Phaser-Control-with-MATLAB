@@ -113,7 +113,6 @@ For each Tx:
    - Extract the 16-element virtual array snapshot $\mathbf{y}_{\text{virt}}$ and detect target AOAs from the measured spectrum.
    - Compute data-driven theoretical response using detected AOAs and display **Figure 3**: Side-by-side Simulated vs. Measured spatial spectra.
    - Display **Figure 4**: 2D Range-Azimuth heatmap (16 virtual elements).
-   - Display **Figure 5**: Individual Tx-to-Rx channel range profiles in a tiled layout.
 
 ---
 

@@ -22,7 +22,6 @@
 %      - Figure 2: Calibrated Range Profile (Target distance identification)
 %      - Figure 3: Side-by-Side Spatial Spectrum (Simulated vs Measured)
 %      - Figure 4: 2D MIMO Range-Azimuth Profile
-%      - Figure 5: Individual Tx-to-Rx Channel Range Profiles
 %
 % Copyright 2026 Microwave Sensing, Signals and Systems (MS3), TU Delft.
 
@@ -387,34 +386,7 @@ if strcmp(arrayMode, '2x8_switched')
     grid on;
 end
 
-%% 10. Figure 5: Individual Tx-to-Rx Channel Range Profiles
-% =========================================================================
-
-figure('Name', 'Individual Tx-to-Rx Channel Range Profiles', 'Position', [100, 100, 1250, 520]);
-tiledlayout(2, nRxChannels, 'TileSpacing', 'compact', 'Padding', 'compact');
-globalPeakPower = max(meanRangePower(searchMask, :, :), [], 'all');
-
-for iTx = 1:2
-    for iRx = 1:nRxChannels
-        nexttile;
-        chPowerDb = 10 * log10(max(meanRangePower(:, iRx, iTx), eps) / globalPeakPower);
-        plot(rangeAxis, chPowerDb, 'LineWidth', 1.2);
-        hold on;
-        xline(targetRangeMeas, '--r');
-        grid on;
-        xlim(targetRangeGate);
-        ylim([-50, 5]);
-        title(sprintf('Tx%d - Rx%d', iTx, iRx));
-        if iTx == 2
-            xlabel('Range (m)');
-        end
-        if iRx == 1
-            ylabel('Power (dB)');
-        end
-    end
-end
-
-%% 11. Local Helpers
+%% 10. Local Helpers
 % =========================================================================
 
 function pulseData = arrangeMimoPulseData(rawData, rx, bf, bf_TDD)
