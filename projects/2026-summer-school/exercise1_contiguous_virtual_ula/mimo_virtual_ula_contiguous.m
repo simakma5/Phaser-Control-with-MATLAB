@@ -145,10 +145,23 @@ else
             end
         end
         
+        % Pulse extraction timing parameters from Phaser and TDD setup
+        fs_radar = rx.SamplingRate;
+        tsweep = double(bf.FrequencyDeviationTime) / 1e6;
+        tstartsweep = bf_TDD.Ch0On;
+        tpulse = bf_TDD.FrameLength / 1e3;
+        
+        sweepoffsetsamples = ceil(tstartsweep * fs_radar);
+        sweepsamples = (1:ceil(tsweep * fs_radar)) + sweepoffsetsamples;
+        pulseendsample = round(tpulse * fs_radar);
+        pulsestartsamples = (0:(nPulses - 1)) * pulseendsample;
+        sampleidxs = repmat(sweepsamples.', 1, nPulses) + pulsestartsamples;
+        nFastTime = length(sweepsamples);
+        
         % Sequential 8-Element Rx Readout across ADAR1000 chips
-        % ADAR1000_1: Channels 1-4 (Pluto Rx1)
-        % ADAR1000_2: Channels 5-8 (Pluto Rx2)
-        rx_raw_8ch = zeros(rx.SamplesPerFrame, nPulses, nRx);
+        % ADAR1000_1: Channels 1-4 (Pluto Rx1 / Column 2)
+        % ADAR1000_2: Channels 5-8 (Pluto Rx2 / Column 1)
+        rx_raw_8ch = zeros(nFastTime, nPulses, nRx);
         
         for ch = 1:4
             % Power down all 8 channels
@@ -158,13 +171,31 @@ else
             bf.RxPowerDown(ch + 4) = 0;
             bf.LatchRxSettings();
             
-            % Capture coherent burst
-            data = captureTransmitWaveform(rx, tx, bf);
-            data = arrangePulseData(data, rx, bf, bf_TDD);
+            % Capture raw coherent burst (nSamples x 2)
+            data_raw = captureTransmitWaveform(rx, tx, bf);
             
-            % Store isolated channel responses
-            rx_raw_8ch(:, :, ch)     = data(:, :, 2); % Pluto Rx1
-            rx_raw_8ch(:, :, ch + 4) = data(:, :, 1); % Pluto Rx2
+            % Extract both Pluto channels independently into [nFastTime x nPulses]
+            col_rx1 = data_raw(:, 2); % Pluto Rx1 (Subarray 1: Elements 1-4)
+            col_rx2 = data_raw(:, 1); % Pluto Rx2 (Subarray 2: Elements 5-8)
+            
+            max_idx = max(sampleidxs, [], 'all');
+            if max_idx <= size(data_raw, 1)
+                pulse_data_rx1 = col_rx1(sampleidxs);
+                pulse_data_rx2 = col_rx2(sampleidxs);
+            else
+                valid_mask = sampleidxs <= size(data_raw, 1);
+                pulse_data_rx1 = zeros(size(sampleidxs));
+                pulse_data_rx2 = zeros(size(sampleidxs));
+                pulse_data_rx1(valid_mask) = col_rx1(sampleidxs(valid_mask));
+                pulse_data_rx2(valid_mask) = col_rx2(sampleidxs(valid_mask));
+            end
+            
+            % Apply analog & digital calibration weights
+            cal1 = calibrationweights.AnalogWeights(ch, 1) * calibrationweights.DigitalWeights(1);
+            cal2 = calibrationweights.AnalogWeights(ch, 2) * calibrationweights.DigitalWeights(2);
+            
+            rx_raw_8ch(:, :, ch)     = pulse_data_rx1 * conj(cal1);
+            rx_raw_8ch(:, :, ch + 4) = pulse_data_rx2 * conj(cal2);
         end
         
         % Restore all channels
@@ -175,10 +206,17 @@ else
         % Subtract clutter across pulses
         rx_mti = rx_raw_8ch - mean(rx_raw_8ch, 2);
         
-        % Range FFT across fast-time dimension
-        range_fft = fft(rx_mti, [], 1);
-        range_prof = squeeze(mean(abs(range_fft(:, :, :)), [2, 3]));
-        [~, target_bin] = max(range_prof(1:floor(end/2)));
+        % Range FFT across fast-time dimension with windowing
+        win_fast = 0.5 * (1 - cos(2 * pi * (0:nFastTime-1)' / max(1, nFastTime - 1)));
+        rx_win = rx_mti .* win_fast;
+        range_fft = fft(rx_win, [], 1);
+        
+        % Average range profile to identify target range bin (skip DC bins 1:3)
+        range_prof = squeeze(mean(mean(abs(range_fft), 2), 3));
+        search_bins = 4:floor(nFastTime / 2);
+        [~, max_rel_bin] = max(range_prof(search_bins));
+        target_bin = search_bins(max_rel_bin);
+        fprintf('Detected target peak at range bin %d\n', target_bin);
         
         % Extract complex snapshot across pulses at target range bin
         for el = 1:nRx
