@@ -14,9 +14,10 @@ warning('off','MATLAB:system:ObsoleteSystemObjectMixin');
 % =========================================================================
 
 % Target Geometry (Used for Simulation and Hardware Range-Gating)
-target_range    = 2.0;         % Target distance (m)
-target1_azimuth = -4.5;        % Target 1 azimuth angle (deg)
-target2_azimuth = 4.5;         % Target 2 azimuth angle (deg)
+target_range    = 1.4;         % Target distance (m)
+target1_azimuth = -14.0;       % Target 1 azimuth angle (deg)
+target2_azimuth = 14.0;        % Target 2 azimuth angle (deg)
+tx_phase_cal    = 0.0;         % Tx cable/switch phase calibration (deg)
 
 % System & Radar Parameters
 fc = 10e9;                     % Carrier frequency (10 GHz)
@@ -100,20 +101,22 @@ sampleidxs = repmat(sweepsamples.', 1, nPulses) + pulsestartsamples;
 nFastTime = length(sweepsamples);
 fast_win = 0.5 * (1 - cos(2 * pi * (0:nFastTime - 1)' / (nFastTime - 1)));
 
-digitalWeights = digitalWeightsCalAdjustment([1; 1], calibrationweights.DigitalWeights);
-
 %% 4. Range-Gating: Locate Target Range Bin
 % =========================================================================
-fprintf('Capturing reference range profile at boresight...\n');
+fprintf('Capturing reference range profile steered toward Target 1 (%.1f deg)...\n', target1_azimuth);
 
-% Set analog beamformer to boresight (broadside)
-boresight_weights = analogWeightsCalAdjustment([ones(4,1), ones(4,1)], calibrationweights.AnalogWeights);
-setAnalogBfWeights(bf, boresight_weights);
+% Steer Rx beam towards target1_azimuth to maximize target SNR and avoid boresight clutter
+steer_t1_analog = exp(-1j * 2 * pi * (0:3)' * 0.5 * sind(target1_azimuth));
+steer_t1_digital = [1; exp(-1j * 2 * pi * 2.0 * sind(target1_azimuth))];
+analog_t1 = analogWeightsCalAdjustment([steer_t1_analog, steer_t1_analog], calibrationweights.AnalogWeights);
+digital_t1 = digitalWeightsCalAdjustment(steer_t1_digital, calibrationweights.DigitalWeights);
+
+setAnalogBfWeights(bf, analog_t1);
 bf.EnableOut1 = true;
 pause(0.05);
 
 ref_raw = captureTransmitWaveform(rx, tx, bf);
-ref_combined = ref_raw * conj(digitalWeights);
+ref_combined = ref_raw * conj(digital_t1);
 ref_pulses = ref_combined(sampleidxs);
 
 % Range FFT
@@ -124,8 +127,8 @@ range_profile = mean(abs(ref_fft), 2);
 f_beat = (0:(nFastTime - 1))' / nFastTime * fs;
 range_axis = f_beat * c / (2 * sweepSlope);
 
-% Identify target range bin within +/- 0.8 m of specified target_range
-range_mask = (range_axis >= (target_range - 0.8)) & (range_axis <= (target_range + 0.8));
+% Identify target range bin within +/- 0.4 m of specified target_range
+range_mask = (range_axis >= (target_range - 0.4)) & (range_axis <= (target_range + 0.4));
 search_indices = find(range_mask);
 
 if isempty(search_indices)
@@ -151,14 +154,17 @@ pause(0.05);
 for iA = 1:nAngles
     ang = scanAngles(iA);
     
-    % Steering weights for physical 8-element array
-    steerweights = exp(-1j * k * x_rx.' * sind(ang));
-    analogsteer = analogWeightsCalAdjustment([steerweights(1:4), steerweights(5:8)], calibrationweights.AnalogWeights);
+    % Hybrid beamforming: steer 4-element analog subarrays and 2-element digital array
+    analog_1sub = exp(-1j * 2 * pi * (0:3)' * 0.5 * sind(ang));
+    analogsteer = analogWeightsCalAdjustment([analog_1sub, analog_1sub], calibrationweights.AnalogWeights);
     setAnalogBfWeights(bf, analogsteer);
+    
+    digitalWeights = [1; exp(-1j * 2 * pi * 2.0 * sind(ang))];
+    digitalsteer = digitalWeightsCalAdjustment(digitalWeights, calibrationweights.DigitalWeights);
     
     % Capture and process burst
     data_raw = captureTransmitWaveform(rx, tx, bf);
-    data_comb = data_raw * conj(digitalWeights);
+    data_comb = data_raw * conj(digitalsteer);
     data_pulses = data_comb(sampleidxs);
     
     % Extract complex envelope at target range bin
@@ -174,14 +180,17 @@ pause(0.05);
 for iA = 1:nAngles
     ang = scanAngles(iA);
     
-    % Steering weights for physical 8-element array
-    steerweights = exp(-1j * k * x_rx.' * sind(ang));
-    analogsteer = analogWeightsCalAdjustment([steerweights(1:4), steerweights(5:8)], calibrationweights.AnalogWeights);
+    % Hybrid beamforming: steer 4-element analog subarrays and 2-element digital array
+    analog_1sub = exp(-1j * 2 * pi * (0:3)' * 0.5 * sind(ang));
+    analogsteer = analogWeightsCalAdjustment([analog_1sub, analog_1sub], calibrationweights.AnalogWeights);
     setAnalogBfWeights(bf, analogsteer);
+    
+    digitalWeights = [1; exp(-1j * 2 * pi * 2.0 * sind(ang))];
+    digitalsteer = digitalWeightsCalAdjustment(digitalWeights, calibrationweights.DigitalWeights);
     
     % Capture and process burst
     data_raw = captureTransmitWaveform(rx, tx, bf);
-    data_comb = data_raw * conj(digitalWeights);
+    data_comb = data_raw * conj(digitalsteer);
     data_pulses = data_comb(sampleidxs);
     
     % Extract complex envelope at target range bin
@@ -200,8 +209,8 @@ fprintf('Hardware acquisition complete.\n\n');
 P_rx_hw = abs(s1_meas).^2;
 
 % Virtual 16-element array synthesis:
-% S_virt(theta) = S1(theta) + S2(theta) * exp(j * 2*pi * dTx * sin(theta) / lambda)
-tx2_phase_comp = exp(1j * k * dTx * sind(scanAngles));
+% S_virt(theta) = S1(theta) + S2(theta) * exp(j * (2*pi * dTx * sin(theta) / lambda - tx_phase_cal))
+tx2_phase_comp = exp(1j * (k * dTx * sind(scanAngles) - deg2rad(tx_phase_cal)));
 s_virt_meas = s1_meas + s2_meas .* tx2_phase_comp;
 P_virt_hw = abs(s_virt_meas).^2;
 

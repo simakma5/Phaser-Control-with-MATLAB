@@ -67,19 +67,25 @@ bf.EnableOut1 = true;
 bf.EnableOut1 = false;
 ```
 
-### 3.2 Analog Beamsteering & Coherent Synthesis
-The physical 8-element Rx array is steered across azimuth angles using the ADAR1000 6-bit analog phase shifters:
+### 3.2 Hybrid Beamsteering & Coherent Synthesis
+The physical 8-element Rx array employs hybrid beamforming: each 4-element subarray (ADAR1000 Chip 1 and Chip 2) is steered in analog, and the two subarrays (separated by $4 d_{\text{Rx}} = 2\lambda$) are combined digitally via Pluto's two receiver channels:
 ```matlab
-steerweights = exp(-1j * (2*pi/lambda) * x_rx.' * sind(ang));
-analogsteer = analogWeightsCalAdjustment([steerweights(1:4), steerweights(5:8)], calibrationweights.AnalogWeights);
+% Steer 4-element analog subarrays:
+analog_1sub = exp(-1j * (2*pi/lambda) * (0:3)' * dRx * sind(ang));
+analogsteer = analogWeightsCalAdjustment([analog_1sub, analog_1sub], calibrationweights.AnalogWeights);
 setAnalogBfWeights(bf, analogsteer);
+
+% Steer 2-channel digital combiner:
+digitalWeights = [1; exp(-1j * (2*pi/lambda) * (4*dRx) * sind(ang))];
+digitalsteer = digitalWeightsCalAdjustment(digitalWeights, calibrationweights.DigitalWeights);
+data_comb = data_raw * conj(digitalsteer);
 ```
 
 For each scan angle $\theta$:
 1. Tx 1 is selected; the complex return at the target range bin $S_1(\theta)$ is recorded.
 2. Tx 2 is selected; the complex return at the target range bin $S_2(\theta)$ is recorded.
 3. The virtual 16-element array response is synthesized by applying the geometric phase compensation for Tx 2:
-   $$S_{\text{virt}}(\theta) = S_1(\theta) + S_2(\theta) \cdot e^{j \frac{2\pi d_{\text{Tx}}}{\lambda} \sin\theta}$$
+   $$S_{\text{virt}}(\theta) = S_1(\theta) + S_2(\theta) \cdot e^{j \left(\frac{2\pi d_{\text{Tx}}}{\lambda} \sin\theta - \phi_{\text{cal}}\right)}$$
 4. Power spectra are computed as $P_{\text{rx}}(\theta) = |S_1(\theta)|^2$ and $P_{\text{virt}}(\theta) = |S_{\text{virt}}(\theta)|^2$.
 
 ---
@@ -87,12 +93,13 @@ For each scan angle $\theta$:
 ## 4. Laboratory Workflow
 
 ### Step 1: Target Setup
-1. Position two radar targets (e.g., corner reflectors) at distance $R \approx 2.0\text{ m}$.
-2. Set target azimuth angles in `mimo_virtual_ula_contiguous.m`:
+1. Position two radar targets (e.g., corner reflectors) at distance $R \approx 1.4\text{ m}$.
+2. Set target parameters in `mimo_virtual_ula_contiguous.m`:
    ```matlab
-   target_range    = 2.0;         % Target range in meters
-   target1_azimuth = -4.5;        % Target 1 azimuth in degrees
-   target2_azimuth = 4.5;         % Target 2 azimuth in degrees
+   target_range    = 1.4;         % Target range in meters
+   target1_azimuth = -14.0;       % Target 1 azimuth in degrees
+   target2_azimuth = 14.0;        % Target 2 azimuth in degrees
+   tx_phase_cal    = 0.0;         % Tx phase calibration in degrees
    ```
 
 ### Step 2: Hardware Execution
