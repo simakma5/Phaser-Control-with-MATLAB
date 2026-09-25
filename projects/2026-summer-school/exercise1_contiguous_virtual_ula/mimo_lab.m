@@ -1,5 +1,5 @@
-%% MIMO Radar Summer School 2026 - Exercise 1: Contiguous Virtual ULA
-% 
+%% MIMO Radar Summer School 2026 - Contiguous Virtual ULA
+%
 % Synthesizes a 16-element contiguous virtual ULA from an 8-element physical
 % Rx array and two electronically switched Tx antennas (ADALM-PHASER SMA Out 1 & Out 2).
 % Compares physical 8-element and virtual 16-element spatial spectra for both
@@ -30,9 +30,12 @@ dRx = lambda / 2;              % Physical Rx spacing (0.015 m)
 dTx = 4 * lambda;              % Tx separation = 8 * dRx (0.12 m)
 
 x_rx = (0:(nRx - 1)) * dRx;    % Physical Rx coordinates (m)
-x_tx = [0, dTx];               % Physical Tx coordinates (m)
 x_virt = (0:(2 * nRx - 1)) * dRx; % Virtual ULA coordinates (m)
 nVirt = length(x_virt);        % 16 virtual elements
+
+% Subarray geometry in wavelengths (for steering weight computation)
+dRx_lambda = 0.5;              % dRx / lambda
+dSub_lambda = 2.0;             % Inter-subarray spacing / lambda = 4 * dRx / lambda
 
 % Angular Scan Grid
 scanAngles = -30:0.5:30;       % Azimuth evaluation grid (deg)
@@ -43,6 +46,9 @@ prf = 2000;                    % Pulse repetition frequency (Hz)
 nPulses = 32;                  % Pulses per burst
 fs = 1e6;                      % Pluto sampling rate (1 MHz)
 rampbandwidth = 500e6;         % FMCW sweep bandwidth (500 MHz)
+
+% Range calibration offset (accounts for internal delays)
+calRange = 0.5;                % Range offset calibration (m)
 
 %% 2. Simulated Spatial Spectrum Calculation
 % =========================================================================
@@ -68,7 +74,7 @@ for iA = 1:nAngles
     ang = scanAngles(iA);
     a_rx   = exp(-1j * k * x_rx.' * sind(ang));
     a_virt = exp(-1j * k * x_virt.' * sind(ang));
-    
+
     P_rx_sim(iA)   = abs(a_rx' * s_rx_sim)^2 / (nRx^2);
     P_virt_sim(iA) = abs(a_virt' * s_virt_sim)^2 / (nVirt^2);
 end
@@ -101,13 +107,16 @@ sampleidxs = repmat(sweepsamples.', 1, nPulses) + pulsestartsamples;
 nFastTime = length(sweepsamples);
 fast_win = 0.5 * (1 - cos(2 * pi * (0:nFastTime - 1)' / (nFastTime - 1)));
 
+% Discard first capture (Pluto buffer flush)
+captureTransmitWaveform(rx, tx, bf);
+
 %% 4. Range-Gating: Locate Target Range Bin
 % =========================================================================
 fprintf('Capturing reference range profile steered toward Target 1 (%.1f deg)...\n', target1_azimuth);
 
-% Steer Rx beam towards target1_azimuth to maximize target SNR and avoid boresight clutter
-steer_t1_analog = exp(-1j * 2 * pi * (0:3)' * 0.5 * sind(target1_azimuth));
-steer_t1_digital = [1; exp(-1j * 2 * pi * 2.0 * sind(target1_azimuth))];
+% Steer Rx beam towards target1_azimuth to maximize target SNR
+steer_t1_analog = exp(-1j * 2 * pi * (0:3)' * dRx_lambda * sind(target1_azimuth));
+steer_t1_digital = [1; exp(-1j * 2 * pi * dSub_lambda * sind(target1_azimuth))];
 analog_t1 = analogWeightsCalAdjustment([steer_t1_analog, steer_t1_analog], calibrationweights.AnalogWeights);
 digital_t1 = digitalWeightsCalAdjustment(steer_t1_digital, calibrationweights.DigitalWeights);
 
@@ -123,9 +132,9 @@ ref_pulses = ref_combined(sampleidxs);
 ref_fft = fft(ref_pulses .* fast_win, [], 1);
 range_profile = mean(abs(ref_fft), 2);
 
-% Range Axis
+% Range Axis (apply calibration offset)
 f_beat = (0:(nFastTime - 1))' / nFastTime * fs;
-range_axis = f_beat * c / (2 * sweepSlope);
+range_axis = f_beat * c / (2 * sweepSlope) - calRange;
 
 % Identify target range bin within +/- 0.4 m of specified target_range
 range_mask = (range_axis >= (target_range - 0.4)) & (range_axis <= (target_range + 0.4));
@@ -153,20 +162,20 @@ pause(0.05);
 
 for iA = 1:nAngles
     ang = scanAngles(iA);
-    
+
     % Hybrid beamforming: steer 4-element analog subarrays and 2-element digital array
-    analog_1sub = exp(-1j * 2 * pi * (0:3)' * 0.5 * sind(ang));
+    analog_1sub = exp(-1j * 2 * pi * (0:3)' * dRx_lambda * sind(ang));
     analogsteer = analogWeightsCalAdjustment([analog_1sub, analog_1sub], calibrationweights.AnalogWeights);
     setAnalogBfWeights(bf, analogsteer);
-    
-    digitalWeights = [1; exp(-1j * 2 * pi * 2.0 * sind(ang))];
+
+    digitalWeights = [1; exp(-1j * 2 * pi * dSub_lambda * sind(ang))];
     digitalsteer = digitalWeightsCalAdjustment(digitalWeights, calibrationweights.DigitalWeights);
-    
+
     % Capture and process burst
     data_raw = captureTransmitWaveform(rx, tx, bf);
     data_comb = data_raw * conj(digitalsteer);
     data_pulses = data_comb(sampleidxs);
-    
+
     % Extract complex envelope at target range bin
     pulse_fft = fft(data_pulses .* fast_win, [], 1);
     s1_meas(iA) = mean(pulse_fft(target_bin, :));
@@ -179,27 +188,27 @@ pause(0.05);
 
 for iA = 1:nAngles
     ang = scanAngles(iA);
-    
+
     % Hybrid beamforming: steer 4-element analog subarrays and 2-element digital array
-    analog_1sub = exp(-1j * 2 * pi * (0:3)' * 0.5 * sind(ang));
+    analog_1sub = exp(-1j * 2 * pi * (0:3)' * dRx_lambda * sind(ang));
     analogsteer = analogWeightsCalAdjustment([analog_1sub, analog_1sub], calibrationweights.AnalogWeights);
     setAnalogBfWeights(bf, analogsteer);
-    
-    digitalWeights = [1; exp(-1j * 2 * pi * 2.0 * sind(ang))];
+
+    digitalWeights = [1; exp(-1j * 2 * pi * dSub_lambda * sind(ang))];
     digitalsteer = digitalWeightsCalAdjustment(digitalWeights, calibrationweights.DigitalWeights);
-    
+
     % Capture and process burst
     data_raw = captureTransmitWaveform(rx, tx, bf);
     data_comb = data_raw * conj(digitalsteer);
     data_pulses = data_comb(sampleidxs);
-    
+
     % Extract complex envelope at target range bin
     pulse_fft = fft(data_pulses .* fast_win, [], 1);
     s2_meas(iA) = mean(pulse_fft(target_bin, :));
 end
 
-% Restore hardware to idle
-disableTddTrigger(bf_TDD);
+% Cleanup hardware
+cleanupAntenna(rx, tx, bf, bf_TDD);
 fprintf('Hardware acquisition complete.\n\n');
 
 %% 6. Virtual Array Synthesis & Spatial Spectrum
@@ -209,7 +218,7 @@ fprintf('Hardware acquisition complete.\n\n');
 P_rx_hw = abs(s1_meas).^2;
 
 % Virtual 16-element array synthesis:
-% S_virt(theta) = S1(theta) + S2(theta) * exp(j * (2*pi * dTx * sin(theta) / lambda - tx_phase_cal))
+% S_virt(theta) = S1(theta) + S2(theta) * exp(j * (k * dTx * sin(theta) - tx_phase_cal))
 tx2_phase_comp = exp(1j * (k * dTx * sind(scanAngles) - deg2rad(tx_phase_cal)));
 s_virt_meas = s1_meas + s2_meas .* tx2_phase_comp;
 P_virt_hw = abs(s_virt_meas).^2;
@@ -224,33 +233,33 @@ P_virt_hw_db = norm_db(P_virt_hw);
 figure('Name', 'Range Profile', 'Position', [80, 150, 600, 360]);
 plot(range_axis, 20 * log10(range_profile / max(range_profile)), 'LineWidth', 1.5);
 hold on;
-xline(target_range_meas, '--r', sprintf('Target: %.2f m', target_range_meas), ...
+xline(target_range_meas, '--r', sprintf('%.2f m', target_range_meas), ...
       'LabelVerticalAlignment', 'bottom', 'LineWidth', 1.2);
 grid on; xlim([0, 8]); ylim([-40, 5]);
 xlabel('Range (m)'); ylabel('Normalized Amplitude (dB)');
-title('Measured Range Profile');
+title('Range Profile');
 
 % Figure 2: Side-by-Side Spatial Spectrum Comparison
-figure('Name', 'Spatial Spectrum Comparison', 'Position', [120, 150, 1150, 480]);
+figure('Name', 'Spatial Spectrum', 'Position', [120, 150, 1150, 480]);
 
-% Left Subplot: Simulated Spatial Spectrum
+% Left Subplot: Simulated
 subplot(1, 2, 1);
-plot(scanAngles, P_rx_sim_db,   'LineWidth', 1.8, 'DisplayName', 'Physical Rx (8 elements, 3.5\lambda)'); hold on;
-plot(scanAngles, P_virt_sim_db, 'LineWidth', 1.8, 'DisplayName', 'Virtual Array (16 elements, 7.5\lambda)');
-xline(target1_azimuth, ':k', sprintf('%.1f^\\circ', target1_azimuth), 'LabelVerticalAlignment', 'top');
-xline(target2_azimuth, ':k', sprintf('%.1f^\\circ', target2_azimuth), 'LabelVerticalAlignment', 'top');
+plot(scanAngles, P_rx_sim_db,   'LineWidth', 1.8, 'DisplayName', sprintf('Physical (N=%d)', nRx)); hold on;
+plot(scanAngles, P_virt_sim_db, 'LineWidth', 1.8, 'DisplayName', sprintf('Virtual (N=%d)', nVirt));
+xline(target1_azimuth, ':k', 'HandleVisibility', 'off');
+xline(target2_azimuth, ':k', 'HandleVisibility', 'off');
 grid on; xlim([min(scanAngles), max(scanAngles)]); ylim([-35, 2]);
-xlabel('Azimuth Angle (deg)'); ylabel('Normalized Power (dB)');
-title('Simulated Spatial Spectrum');
+xlabel('Azimuth (deg)'); ylabel('Normalized Power (dB)');
+title('Simulated');
 legend('Location', 'south');
 
-% Right Subplot: Measured Spatial Spectrum
+% Right Subplot: Measured
 subplot(1, 2, 2);
-plot(scanAngles, P_rx_hw_db,   'LineWidth', 1.8, 'DisplayName', 'Physical Rx (8 elements, 3.5\lambda)'); hold on;
-plot(scanAngles, P_virt_hw_db, 'LineWidth', 1.8, 'DisplayName', 'Virtual Array (16 elements, 7.5\lambda)');
-xline(target1_azimuth, ':k', sprintf('%.1f^\\circ', target1_azimuth), 'LabelVerticalAlignment', 'top');
-xline(target2_azimuth, ':k', sprintf('%.1f^\\circ', target2_azimuth), 'LabelVerticalAlignment', 'top');
+plot(scanAngles, P_rx_hw_db,   'LineWidth', 1.8, 'DisplayName', sprintf('Physical (N=%d)', nRx)); hold on;
+plot(scanAngles, P_virt_hw_db, 'LineWidth', 1.8, 'DisplayName', sprintf('Virtual (N=%d)', nVirt));
+xline(target1_azimuth, ':k', 'HandleVisibility', 'off');
+xline(target2_azimuth, ':k', 'HandleVisibility', 'off');
 grid on; xlim([min(scanAngles), max(scanAngles)]); ylim([-35, 2]);
-xlabel('Azimuth Angle (deg)'); ylabel('Normalized Power (dB)');
-title('Measured Spatial Spectrum');
+xlabel('Azimuth (deg)'); ylabel('Normalized Power (dB)');
+title('Measured');
 legend('Location', 'south');

@@ -94,7 +94,7 @@ For each scan angle $\theta$:
 
 ### Step 1: Target Setup
 1. Position two radar targets (e.g., corner reflectors) at distance $R \approx 1.4\text{ m}$.
-2. Set target parameters in `mimo_virtual_ula_contiguous.m`:
+2. Set target parameters in `mimo_lab.m`:
    ```matlab
    target_range    = 1.4;         % Target range in meters
    target1_azimuth = -14.0;       % Target 1 azimuth in degrees
@@ -104,7 +104,7 @@ For each scan angle $\theta$:
 
 ### Step 2: Hardware Execution
 1. Connect Tx 1 to SMA Out 1 and Tx 2 to SMA Out 2.
-2. Run `mimo_virtual_ula_contiguous.m`.
+2. Run `mimo_lab.m`.
 3. The script will:
    - Calculate theoretical simulated spatial spectra for the physical and virtual arrays.
    - Capture a boresight range profile to locate the target range gate.
