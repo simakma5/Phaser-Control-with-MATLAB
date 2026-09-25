@@ -93,7 +93,7 @@ tstartsweep = bf_TDD.Ch0On;
 tpulse = bf_TDD.FrameLength / 1e3;
 
 sweepoffsetsamples = ceil(tstartsweep * fs);
-sweepsamples = (1:ceil(tsweep * fs)) + sweepoffsetsamples;
+sweepsamples = (1:ceil(tSweep * fs)) + sweepoffsetsamples;
 pulseendsample = round(tpulse * fs);
 pulsestartsamples = (0:(nPulses - 1)) * pulseendsample;
 sampleidxs = repmat(sweepsamples.', 1, nPulses) + pulsestartsamples;
