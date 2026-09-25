@@ -94,12 +94,10 @@ For each Tx:
 ## 4. Laboratory Workflow
 
 ### Step 1: Target Setup
-1. Position two radar targets (e.g., corner reflectors) at distance $R \approx 1.4\text{ m}$ (azimuth $\approx \pm 14^\circ$).
+1. Position two radar targets (e.g., corner reflectors) at distance $R \approx 1.4\text{ m}$ (azimuth $\approx \pm 14^\circ$). No manual entry of target angles is required; the script automatically detects the target range and AOAs.
 2. Verify settings in `mimo_lab.m`:
    ```matlab
    arrayMode       = '2x8_switched'; % Full 16-element contiguous virtual ULA
-   target1_azimuth = -14.0;          % Target 1 azimuth in degrees
-   target2_azimuth = 14.0;           % Target 2 azimuth in degrees
    calRange        = 1.6;            % Range calibration offset in meters
    targetRangeGate = [0.5, 5.0];     % Target search interval in meters
    ```
@@ -108,11 +106,14 @@ For each Tx:
 1. Connect Tx 1 to SMA Out 1 and Tx 2 to SMA Out 2.
 2. Run `mimo_lab.m`.
 3. The script will:
+   - Display **Figure 1**: MIMO Array Geometry & Virtual Synthesis stem plots.
    - Configure radar via `setupFMCWRadar` with proper TDD gating and buffer flush.
    - Execute 4-pair switched element acquisition for Tx 1 and Tx 2 (8 bursts total).
-   - Compute range FFT and identify the target range bin within `targetRangeGate`.
-   - Form the 16-element virtual array snapshot $\mathbf{y}_{\text{virt}}$.
-   - Compute and display side-by-side simulated vs. measured spatial spectra and the 2D range-azimuth map.
+   - Display **Figure 2**: Calibrated Range Profile with automated target distance identification.
+   - Extract the 16-element virtual array snapshot $\mathbf{y}_{\text{virt}}$ and detect target AOAs from the measured spectrum.
+   - Compute data-driven theoretical response using detected AOAs and display **Figure 3**: Side-by-side Simulated vs. Measured spatial spectra.
+   - Display **Figure 4**: 2D Range-Azimuth heatmap (16 virtual elements).
+   - Display **Figure 5**: Individual Tx-to-Rx channel range profiles in a tiled layout.
 
 ---
 

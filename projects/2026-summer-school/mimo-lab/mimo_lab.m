@@ -4,17 +4,25 @@
 % an 8-element physical Rx array (ADALM-PHASER) and two electronically switched 
 % transmit antennas (SMA Out 1 & Out 2 spaced by 4*lambda).
 %
-% Key Improvements learned from fmcwMimoVerification_v2.m:
-%   1. Uses setupFMCWRadar with verified TDD Ch2 gate duration, initial rx()
-%      buffer flush, and calibrated txWaveform.
-%   2. Uses ground-truth range calibration offset (calRange = 1.6 m) and wide
-%      target search gate ([0.5, 5] m) to reliably lock onto the reflector.
-%   3. Replaces slow/noisy 121-angle hardware scanning with fast, phase-coherent
-%      Switched Single-Element Mode (8 captures total in ~1-2 s) to extract the
-%      full 16-channel virtual array snapshot vector y_virt in C^(16x1).
-%   4. Computes spatial spectra digitally in post-processing across any desired
-%      azimuth grid, and plots side-by-side with theoretical simulation.
-%   5. Supports both '2x8_switched' (16 virtual ULA) and '2x2_subarray' modes.
+% Workflow:
+%   1. Hardware Initialization: setupFMCWRadar with verified TDD Ch2 timing,
+%      buffer flush, and calibration.
+%   2. Virtual Array Geometry: Computes and visualizes physical Rx, physical Tx,
+%      and synthesized virtual 16-element contiguous ULA geometry.
+%   3. Hardware Acquisition: Switched single-element capture across Tx 1 & Tx 2
+%      (8 rapid bursts total) to collect all 16 virtual channel snapshots.
+%   4. Precise Range Measurement: Generates calibrated range profile, identifies
+%      target distance, and extracts complex envelopes at target range bin.
+%   5. Measured Spatial Spectrum & AOA Detection: Computes measured spatial
+%      spectrum via digital beamforming and automatically detects target AOAs.
+%   6. Data-Driven Theoretical Simulation: Produces theoretical spatial spectra
+%      using the detected target AOAs for direct, clean benchmark comparison.
+%   7. Visualizations:
+%      - Figure 1: MIMO Array Geometry & Virtual Synthesis (Stem plot)
+%      - Figure 2: Calibrated Range Profile (Target distance identification)
+%      - Figure 3: Side-by-Side Spatial Spectrum (Simulated vs Measured)
+%      - Figure 4: 2D MIMO Range-Azimuth Profile
+%      - Figure 5: Individual Tx-to-Rx Channel Range Profiles
 %
 % Copyright 2026 Microwave Sensing, Signals and Systems (MS3), TU Delft.
 
@@ -29,15 +37,11 @@ warning('off','MATLAB:system:ObsoleteSystemObjectMixin');
 %   '2x2_subarray' - Dual-subarray baseline (colleague's verified 2x2 mode)
 arrayMode = '2x8_switched';
 
-% Target Geometry (Used for Simulation and Hardware Verification)
-target1_azimuth = -14.0;       % Target 1 azimuth angle (deg)
-target2_azimuth = 14.0;        % Target 2 azimuth angle (deg)
-tx_phase_cal    = 0.0;         % Tx cable/switch phase calibration (deg)
-
-% Range calibration and search gate (ground truth from hardware verification)
+% Calibration and Target Gating
 calRange        = 1.6;         % Hardware range offset calibration (m)
 targetRangeGate = [0.5, 5.0];  % Search interval for reflectors (calibrated m)
 portSwitchPause = 0.10;        % Switch settling time (s)
+tx_phase_cal    = 0.0;         % Tx cable/switch phase calibration (deg)
 
 % System & Radar Parameters
 fc = 10e9;                     % Carrier frequency (10 GHz)
@@ -54,39 +58,41 @@ dRx = lambda / 2;              % Physical Rx spacing (0.015 m)
 dTx = 4 * lambda;              % Tx separation = 8 * dRx (0.12 m)
 
 x_rx = (0:(nRxPhysical - 1)) * dRx;       % Physical Rx coordinates (m)
+x_tx = [0, dTx];                          % Physical Tx coordinates (m)
 x_virt = (0:(2 * nRxPhysical - 1)) * dRx; % Virtual 16-element ULA coordinates (m)
+nVirt = length(x_virt);
 
 % Angular Evaluation Grid (Digital Beamforming)
 azimuthGrid = -60:0.5:60;      % Azimuth evaluation grid (deg)
 nAngles = length(azimuthGrid);
-
-%% 2. Theoretical Simulated Spatial Spectrum Calculation
-% =========================================================================
 k = 2 * pi / lambda;
 
-% Steering vectors for targets
-a_rx_t1   = exp(1j * k * x_rx.' * sind(target1_azimuth));
-a_rx_t2   = exp(1j * k * x_rx.' * sind(target2_azimuth));
-a_virt_t1 = exp(1j * k * x_virt.' * sind(target1_azimuth));
-a_virt_t2 = exp(1j * k * x_virt.' * sind(target2_azimuth));
+%% 2. Figure 1: Virtual Array Geometry & Spatial Convolution
+% =========================================================================
+% Virtual positions correspond to spatial convolution: r_virt = r_Tx (+) r_Rx
 
-% Amplitudes for Target 1 and Target 2
-amp1 = 1.0;
-amp2 = 0.8;
+figure('Name', 'MIMO Array Geometry', 'Position', [80, 100, 950, 480]);
 
-s_rx_sim   = amp1 * a_rx_t1 + amp2 * a_rx_t2;
-s_virt_sim = amp1 * a_virt_t1 + amp2 * a_virt_t2;
+subplot(3, 1, 1);
+stem(x_rx / lambda, ones(1, nRxPhysical), 'filled', 'LineWidth', 1.5, 'Color', [0 0.447 0.741]);
+xlim([-1, 9]); ylim([0, 1.5]); grid on;
+title('Physical Rx Array (8 elements, d = \lambda/2)');
+xlabel('Position along baseline (\lambda)'); ylabel('Active');
+set(gca, 'YTick', [0, 1]);
 
-% Simulated spatial spectra (Bartlett)
-A_rx_grid   = exp(1j * k * x_rx.' * sind(azimuthGrid));     % 8 x nAngles
-A_virt_grid = exp(1j * k * x_virt.' * sind(azimuthGrid));   % 16 x nAngles
+subplot(3, 1, 2);
+stem(x_tx / lambda, ones(1, 2), 'filled', 'LineWidth', 1.5, 'Color', [0.85 0.325 0.098]);
+xlim([-1, 9]); ylim([0, 1.5]); grid on;
+title('Physical Tx Positions (2 Vivaldi antennas, d_{Tx} = 4\lambda = 8\cdot d_{Rx})');
+xlabel('Position along baseline (\lambda)'); ylabel('Active');
+set(gca, 'YTick', [0, 1]);
 
-P_rx_sim   = abs(s_rx_sim.' * conj(A_rx_grid)).^2;
-P_virt_sim = abs(s_virt_sim.' * conj(A_virt_grid)).^2;
-
-norm_db = @(p) 10 * log10(max(p, eps) / max(p));
-P_rx_sim_db   = norm_db(P_rx_sim);
-P_virt_sim_db = norm_db(P_virt_sim);
+subplot(3, 1, 3);
+stem(x_virt / lambda, ones(1, nVirt), 'filled', 'LineWidth', 1.5, 'Color', [0.466 0.674 0.188]);
+xlim([-1, 9]); ylim([0, 1.5]); grid on;
+title('Synthesized Virtual Array (16 elements contiguous, d = \lambda/2)');
+xlabel('Position along baseline (\lambda)'); ylabel('Active');
+set(gca, 'YTick', [0, 1]);
 
 %% 3. FMCW Radar Parameter Derivation & Hardware Setup
 % =========================================================================
@@ -123,7 +129,7 @@ bf.RxPhase(:) = [phaseshifts(:, 1)', phaseshifts(:, 2)'];
 bf.RxGain(:) = 127;
 bf.LatchRxSettings();
 
-%% 4. Hardware Data Acquisition: 2x8 Switched or 2x2 Subarray MIMO
+%% 4. Hardware Data Acquisition
 % =========================================================================
 
 switch arrayMode
@@ -197,7 +203,7 @@ end
 
 fprintf('Data acquisition complete.\n\n');
 
-%% 5. Range Processing & Target Bin Identification
+%% 5. Precise Range Measurement & Target Range Identification (Figure 2)
 % =========================================================================
 nFastTime = size(mimoPulseData, 1);
 nFft = 2^nextpow2(nFastTime);
@@ -226,42 +232,52 @@ combinedPower = sum(sum(meanRangePower, 2), 3);
 targetBin = searchBins(maxSearchIdx);
 targetRangeMeas = rangeAxis(targetBin);
 
-fprintf('Target detected at range: %.2f m (FFT bin %d)\n\n', targetRangeMeas, targetBin);
+fprintf('Detected target range: %.2f m (FFT bin %d)\n\n', targetRangeMeas, targetBin);
 
-%% 6. Virtual Array Synthesis & Spatial Spectrum (DOA)
+% Figure 2: Calibrated Range Profile
+figure('Name', 'Calibrated Range Profile', 'Position', [80, 150, 650, 380]);
+profileSumDb = 10 * log10(max(combinedPower, eps) / max(combinedPower));
+plot(rangeAxis, profileSumDb, 'LineWidth', 1.5);
+hold on;
+xline(targetRangeMeas, '--r', sprintf('Target Range: %.2f m', targetRangeMeas), ...
+      'LabelVerticalAlignment', 'bottom', 'LineWidth', 1.2);
+grid on; xlim(targetRangeGate); ylim([-40, 5]);
+xlabel('Range (m)'); ylabel('Normalized Power (dB)');
+title('Calibrated Range Profile');
+
+%% 6. Measured Spatial Spectrum & AOA Detection
 % =========================================================================
+norm_db = @(p) 10 * log10(max(p, eps) / max(p));
+
+A_rx_grid   = exp(1j * k * x_rx.' * sind(azimuthGrid));     % 8 x nAngles
+A_virt_grid = exp(1j * k * x_virt.' * sind(azimuthGrid));   % 16 x nAngles
 
 switch arrayMode
     case '2x8_switched'
         % Extract complex response across all 8 Rx elements for Tx 1 and Tx 2
-        % H_tx1: 8 x 1 complex vector from Tx 1
-        % H_tx2: 8 x 1 complex vector from Tx 2
         H_tx1 = squeeze(meanRangeSpectrum(targetBin, :, 1)).'; % 8 x 1
         H_tx2 = squeeze(meanRangeSpectrum(targetBin, :, 2)).'; % 8 x 1
-        
-        % Apply Tx cable/switch phase calibration
         H_tx2_cal = H_tx2 * exp(-1j * deg2rad(tx_phase_cal));
         
-        % 16-element contiguous virtual array snapshot:
-        %   Virtual elements 1..8:   Tx 1 + Rx(1..8) -> positions 0 .. 3.5 lambda
-        %   Virtual elements 9..16:  Tx 2 + Rx(1..8) -> positions 4.0 .. 7.5 lambda
+        % 16-element contiguous virtual array snapshot
         H_virt = [H_tx1; H_tx2_cal]; % 16 x 1
         
-        % Digital Beamforming (Bartlett Spatial Spectrum):
-        % P(theta) = |a(theta)^H * H|^2
+        % Digital Beamforming (Bartlett Spatial Spectrum)
         P_rx_meas   = abs(A_rx_grid' * H_tx1).^2;
         P_virt_meas = abs(A_virt_grid' * H_virt).^2;
         
         P_rx_meas_db   = norm_db(P_rx_meas);
         P_virt_meas_db = norm_db(P_virt_meas);
         
+        % Automatic AOA Detection from measured 16-element virtual spectrum
+        [detectedAOAs, detectedPowers] = findSpatialPeaks(P_virt_meas_db, azimuthGrid, 2, 3.0);
+        
     case '2x2_subarray'
-        % 4 virtual channels from 2 Tx x 2 Subarray Rx
         H_sub = squeeze(meanRangeSpectrum(targetBin, :, :)); % 2 Rx x 2 Tx
         h_vec = H_sub(:); % 4 x 1
         
-        rxSubSpacing = 4 * dRx; % 2 lambda
-        txSubSpacing = 4 * dRx; % 2 lambda (for Out 1 / Out 2)
+        rxSubSpacing = 4 * dRx;
+        txSubSpacing = 4 * dRx;
         rxPosSub = ((0:1) - 0.5) * rxSubSpacing;
         txPosSub = ((0:1) - 0.5) * txSubSpacing;
         
@@ -274,54 +290,83 @@ switch arrayMode
             end
         end
         
-        A_sub_grid = exp(1j * k * virtPosSub * sind(azimuthGrid)); % 4 x nAngles
+        A_sub_grid = exp(1j * k * virtPosSub * sind(azimuthGrid));
         P_virt_meas = abs(A_sub_grid' * h_vec).^2;
         P_virt_meas_db = norm_db(P_virt_meas);
-        P_rx_meas_db = P_virt_meas_db; % Subarray placeholder
+        P_rx_meas_db = P_virt_meas_db;
+        
+        [detectedAOAs, detectedPowers] = findSpatialPeaks(P_virt_meas_db, azimuthGrid, 2, 3.0);
 end
 
-%% 7. Visualization
+if isempty(detectedAOAs)
+    detectedAOAs = 0.0;
+    detectedPowers = 0.0;
+end
+
+fprintf('Detected Target AOAs: %s deg\n\n', mat2str(round(detectedAOAs, 1)));
+
+%% 7. Data-Driven Theoretical Simulated Spatial Spectrum
+% =========================================================================
+% Synthesize theoretical response using the exact detected AOAs and relative powers
+
+detectedAmps = 10.^(detectedPowers / 20);
+detectedAmps = detectedAmps / max(detectedAmps);
+
+s_rx_sim   = zeros(nRxPhysical, 1);
+s_virt_sim = zeros(nVirt, 1);
+
+for iT = 1:length(detectedAOAs)
+    theta_t = detectedAOAs(iT);
+    amp_t   = detectedAmps(iT);
+    
+    a_rx_t   = exp(1j * k * x_rx.' * sind(theta_t));
+    a_virt_t = exp(1j * k * x_virt.' * sind(theta_t));
+    
+    s_rx_sim   = s_rx_sim + amp_t * a_rx_t;
+    s_virt_sim = s_virt_sim + amp_t * a_virt_t;
+end
+
+P_rx_sim   = abs(s_rx_sim.' * conj(A_rx_grid)).^2;
+P_virt_sim = abs(s_virt_sim.' * conj(A_virt_grid)).^2;
+
+P_rx_sim_db   = norm_db(P_rx_sim);
+P_virt_sim_db = norm_db(P_virt_sim);
+
+%% 8. Figure 3: Side-by-Side Spatial Spectrum Comparison
 % =========================================================================
 
-% Figure 1: Calibrated Range Profile
-figure('Name', 'Range Profile', 'Position', [80, 150, 600, 380]);
-profileSumDb = 10 * log10(max(combinedPower, eps) / max(combinedPower));
-plot(rangeAxis, profileSumDb, 'LineWidth', 1.5);
-hold on;
-xline(targetRangeMeas, '--r', sprintf('%.2f m', targetRangeMeas), ...
-      'LabelVerticalAlignment', 'bottom', 'LineWidth', 1.2);
-grid on; xlim(targetRangeGate); ylim([-40, 5]);
-xlabel('Range (m)'); ylabel('Normalized Power (dB)');
-title('Calibrated Range Profile');
-
-% Figure 2: Side-by-Side Spatial Spectrum Comparison
 figure('Name', 'Spatial Spectrum Comparison', 'Position', [120, 150, 1150, 480]);
 
-% Left Subplot: Simulated Spatial Spectrum
+% Left Subplot: Simulated Spatial Spectrum (Driven by Detected AOAs)
 subplot(1, 2, 1);
 plot(azimuthGrid, P_rx_sim_db,   'LineWidth', 1.8, 'DisplayName', 'Physical Rx (8 elements, 3.5\lambda)'); hold on;
 plot(azimuthGrid, P_virt_sim_db, 'LineWidth', 1.8, 'DisplayName', 'Virtual Array (16 elements, 7.5\lambda)');
-xline(target1_azimuth, ':k', 'HandleVisibility', 'off');
-xline(target2_azimuth, ':k', 'HandleVisibility', 'off');
+for iT = 1:length(detectedAOAs)
+    xline(detectedAOAs(iT), ':k', sprintf('%.1f^\\circ', detectedAOAs(iT)), ...
+          'LabelVerticalAlignment', 'top', 'HandleVisibility', 'off');
+end
 grid on; xlim([min(azimuthGrid), max(azimuthGrid)]); ylim([-35, 2]);
 xlabel('Azimuth Angle (deg)'); ylabel('Normalized Power (dB)');
-title('Simulated Spatial Spectrum');
+title(sprintf('Simulated Spectrum (AOAs: %s^\\circ)', mat2str(round(detectedAOAs, 1))));
 legend('Location', 'south');
 
 % Right Subplot: Measured Spatial Spectrum
 subplot(1, 2, 2);
 plot(azimuthGrid, P_rx_meas_db,   'LineWidth', 1.8, 'DisplayName', 'Physical Rx (8 elements, 3.5\lambda)'); hold on;
 plot(azimuthGrid, P_virt_meas_db, 'LineWidth', 1.8, 'DisplayName', 'Virtual Array (16 elements, 7.5\lambda)');
-xline(target1_azimuth, ':k', 'HandleVisibility', 'off');
-xline(target2_azimuth, ':k', 'HandleVisibility', 'off');
+for iT = 1:length(detectedAOAs)
+    xline(detectedAOAs(iT), ':k', sprintf('%.1f^\\circ', detectedAOAs(iT)), ...
+          'LabelVerticalAlignment', 'top', 'HandleVisibility', 'off');
+end
 grid on; xlim([min(azimuthGrid), max(azimuthGrid)]); ylim([-35, 2]);
 xlabel('Azimuth Angle (deg)'); ylabel('Normalized Power (dB)');
 title('Measured Spatial Spectrum');
 legend('Location', 'south');
 
-% Figure 3: Range-Azimuth Profile (2D Imaging)
+%% 9. Figure 4: 2D MIMO Range-Azimuth Map
+% =========================================================================
+
 if strcmp(arrayMode, '2x8_switched')
-    % Form 2D range-azimuth map using 16 virtual channels across all range bins
     channelRangeSpectrum = zeros(numel(rangeAxis), 16);
     channelRangeSpectrum(:, 1:8)  = squeeze(meanRangeSpectrum(:, :, 1));
     channelRangeSpectrum(:, 9:16) = squeeze(meanRangeSpectrum(:, :, 2)) * exp(-1j * deg2rad(tx_phase_cal));
@@ -342,7 +387,34 @@ if strcmp(arrayMode, '2x8_switched')
     grid on;
 end
 
-%% 8. Local Helpers
+%% 10. Figure 5: Individual Tx-to-Rx Channel Range Profiles
+% =========================================================================
+
+figure('Name', 'Individual Tx-to-Rx Channel Range Profiles', 'Position', [100, 100, 1250, 520]);
+tiledlayout(2, nRxChannels, 'TileSpacing', 'compact', 'Padding', 'compact');
+globalPeakPower = max(meanRangePower(searchMask, :, :), [], 'all');
+
+for iTx = 1:2
+    for iRx = 1:nRxChannels
+        nexttile;
+        chPowerDb = 10 * log10(max(meanRangePower(:, iRx, iTx), eps) / globalPeakPower);
+        plot(rangeAxis, chPowerDb, 'LineWidth', 1.2);
+        hold on;
+        xline(targetRangeMeas, '--r');
+        grid on;
+        xlim(targetRangeGate);
+        ylim([-50, 5]);
+        title(sprintf('Tx%d - Rx%d', iTx, iRx));
+        if iTx == 2
+            xlabel('Range (m)');
+        end
+        if iRx == 1
+            ylabel('Power (dB)');
+        end
+    end
+end
+
+%% 11. Local Helpers
 % =========================================================================
 
 function pulseData = arrangeMimoPulseData(rawData, rx, bf, bf_TDD)
@@ -381,4 +453,51 @@ function window = localHann(nSamples)
     else
         window = 0.5 - 0.5 * cos(2 * pi * (0:nSamples - 1).' / nSamples);
     end
+end
+
+function [detectedAngles, peakPowers] = findSpatialPeaks(spectrumDb, angleGrid, maxPeaks, minProminence)
+% Local peak finder for spatial spectra with minimum prominence and separation
+    if nargin < 3, maxPeaks = 2; end
+    if nargin < 4, minProminence = 3; end
+    
+    isMax = false(size(spectrumDb));
+    for i = 2:(length(spectrumDb) - 1)
+        if (spectrumDb(i) > spectrumDb(i - 1)) && (spectrumDb(i) > spectrumDb(i + 1))
+            isMax(i) = true;
+        end
+    end
+    
+    peakIdx = find(isMax);
+    if isempty(peakIdx)
+        [~, maxIdx] = max(spectrumDb);
+        detectedAngles = angleGrid(maxIdx);
+        peakPowers = spectrumDb(maxIdx);
+        return;
+    end
+    
+    peakVals = spectrumDb(peakIdx);
+    
+    % Filter out weak peaks (> 25 dB below spectrum max)
+    valid = (peakVals >= (max(spectrumDb) - 25));
+    peakIdx = peakIdx(valid);
+    peakVals = spectrumDb(peakIdx);
+    
+    [~, sortIdx] = sort(peakVals, 'descend');
+    peakIdx = peakIdx(sortIdx);
+    
+    % Enforce minimum angular separation of 4.0 degrees
+    selectedIdx = [];
+    minSeparation = 4.0;
+    for i = 1:length(peakIdx)
+        cand = angleGrid(peakIdx(i));
+        if isempty(selectedIdx) || all(abs(cand - angleGrid(selectedIdx)) >= minSeparation)
+            selectedIdx(end + 1) = peakIdx(i); %#ok<AGROW>
+            if length(selectedIdx) >= maxPeaks
+                break;
+            end
+        end
+    end
+    
+    [detectedAngles, sortAngIdx] = sort(angleGrid(selectedIdx));
+    peakPowers = spectrumDb(selectedIdx(sortAngIdx));
 end
