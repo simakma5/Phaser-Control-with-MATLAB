@@ -67,50 +67,52 @@ bf.EnableOut1 = true;
 bf.EnableOut1 = false;
 ```
 
-### 3.2 Hybrid Beamsteering & Coherent Synthesis
-The physical 8-element Rx array employs hybrid beamforming: each 4-element subarray (ADAR1000 Chip 1 and Chip 2) is steered in analog, and the two subarrays (separated by $4 d_{\text{Rx}} = 2\lambda$) are combined digitally via Pluto's two receiver channels:
-```matlab
-% Steer 4-element analog subarrays:
-analog_1sub = exp(-1j * (2*pi/lambda) * (0:3)' * dRx * sind(ang));
-analogsteer = analogWeightsCalAdjustment([analog_1sub, analog_1sub], calibrationweights.AnalogWeights);
-setAnalogBfWeights(bf, analogsteer);
+### 3.2 Switched Single-Element Mode (2x8 MIMO)
+To recover all 8 physical Rx elements from the PlutoSDR's dual-channel receiver, the ADAR1000 beamformers operate in switched single-element mode:
+- Chip 1 (Subarray 1, elements 1–4) feeds Pluto Channel 2.
+- Chip 2 (Subarray 2, elements 5–8) feeds Pluto Channel 1.
 
-% Steer 2-channel digital combiner:
-digitalWeights = [1; exp(-1j * (2*pi/lambda) * (4*dRx) * sind(ang))];
-digitalsteer = digitalWeightsCalAdjustment(digitalWeights, calibrationweights.DigitalWeights);
-data_comb = data_raw * conj(digitalsteer);
+By cycling through 4 element pairs across the two chips (`bf.RxPowerDown`), all 8 physical Rx elements are captured in 4 FMCW bursts per Tx (8 bursts total in ~1–2 seconds):
+```matlab
+% Pair 1: Elements [1, 5], Pair 2: [2, 6], Pair 3: [3, 7], Pair 4: [4, 8]
+bf.RxPowerDown(:) = 1;
+bf.RxPowerDown(nPair)     = 0; % Chip 1 (Subarray 1)
+bf.RxPowerDown(nPair + 4) = 0; % Chip 2 (Subarray 2)
+bf.LatchRxSettings();
 ```
 
-For each scan angle $\theta$:
-1. Tx 1 is selected; the complex return at the target range bin $S_1(\theta)$ is recorded.
-2. Tx 2 is selected; the complex return at the target range bin $S_2(\theta)$ is recorded.
-3. The virtual 16-element array response is synthesized by applying the geometric phase compensation for Tx 2:
-   $$S_{\text{virt}}(\theta) = S_1(\theta) + S_2(\theta) \cdot e^{j \left(\frac{2\pi d_{\text{Tx}}}{\lambda} \sin\theta - \phi_{\text{cal}}\right)}$$
-4. Power spectra are computed as $P_{\text{rx}}(\theta) = |S_1(\theta)|^2$ and $P_{\text{virt}}(\theta) = |S_{\text{virt}}(\theta)|^2$.
+For each Tx:
+1. Tx 1 is selected (`bf.EnableOut1 = true`); the 8 physical Rx element returns $\mathbf{y}_1 \in \mathbb{C}^{8 \times 1}$ at the target range bin are recorded.
+2. Tx 2 is selected (`bf.EnableOut1 = false`); the 8 physical Rx element returns $\mathbf{y}_2 \in \mathbb{C}^{8 \times 1}$ at the target range bin are recorded.
+3. The 16-element virtual array snapshot is concatenated:
+   $$\mathbf{y}_{\text{virt}} = \begin{bmatrix} \mathbf{y}_1 \\ \mathbf{y}_2 \cdot e^{-j \Delta\phi_{\text{cal}}} \end{bmatrix} \in \mathbb{C}^{16 \times 1}$$
+4. Spatial spectra are computed digitally in post-processing across azimuth angles $\theta$:
+   $$P_{\text{rx}}(\theta) = |\mathbf{a}_{\text{rx}}^H(\theta) \mathbf{y}_1|^2, \quad P_{\text{virt}}(\theta) = |\mathbf{a}_{\text{virt}}^H(\theta) \mathbf{y}_{\text{virt}}|^2$$
 
 ---
 
 ## 4. Laboratory Workflow
 
 ### Step 1: Target Setup
-1. Position two radar targets (e.g., corner reflectors) at distance $R \approx 1.4\text{ m}$.
-2. Set target parameters in `mimo_lab.m`:
+1. Position two radar targets (e.g., corner reflectors) at distance $R \approx 1.4\text{ m}$ (azimuth $\approx \pm 14^\circ$).
+2. Verify settings in `mimo_lab.m`:
    ```matlab
-   target_range    = 1.4;         % Target range in meters
-   target1_azimuth = -14.0;       % Target 1 azimuth in degrees
-   target2_azimuth = 14.0;        % Target 2 azimuth in degrees
-   tx_phase_cal    = 0.0;         % Tx phase calibration in degrees
+   arrayMode       = '2x8_switched'; % Full 16-element contiguous virtual ULA
+   target1_azimuth = -14.0;          % Target 1 azimuth in degrees
+   target2_azimuth = 14.0;           % Target 2 azimuth in degrees
+   calRange        = 1.6;            % Range calibration offset in meters
+   targetRangeGate = [0.5, 5.0];     % Target search interval in meters
    ```
 
 ### Step 2: Hardware Execution
 1. Connect Tx 1 to SMA Out 1 and Tx 2 to SMA Out 2.
 2. Run `mimo_lab.m`.
 3. The script will:
-   - Calculate theoretical simulated spatial spectra for the physical and virtual arrays.
-   - Capture a boresight range profile to locate the target range gate.
-   - Electronically sweep azimuth angles for Tx 1 and Tx 2.
-   - Synthesize the 16-element virtual array response.
-   - Display the measured range profile and side-by-side simulated vs. measured spatial spectra.
+   - Configure radar via `setupFMCWRadar` with proper TDD gating and buffer flush.
+   - Execute 4-pair switched element acquisition for Tx 1 and Tx 2 (8 bursts total).
+   - Compute range FFT and identify the target range bin within `targetRangeGate`.
+   - Form the 16-element virtual array snapshot $\mathbf{y}_{\text{virt}}$.
+   - Compute and display side-by-side simulated vs. measured spatial spectra and the 2D range-azimuth map.
 
 ---
 
