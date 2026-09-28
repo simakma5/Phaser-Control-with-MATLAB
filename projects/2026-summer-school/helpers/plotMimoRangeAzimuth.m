@@ -17,9 +17,9 @@ function fig = plotMimoRangeAzimuth(rangeResults, spatialResults, doaParams)
     channelRangeSpectrum(:, 9:16) = squeeze(meanRangeSpectrum(:, :, 2)) * exp(-1j * deg2rad(tx_phase_cal));
 
     rangeAzimuth = abs(channelRangeSpectrum * conj(A_virt_grid)); % [nRange x nAngles]
-    rangeAzimuthDb = 20 * log10(max(rangeAzimuth, eps) / max(rangeAzimuth, [], 'all'));
-
     plotMask = rangeAxis >= targetRangeGate(1) & rangeAxis <= targetRangeGate(2);
+    targetPeak = max(rangeAzimuth(plotMask, :), [], 'all');
+    rangeAzimuthDb = 20 * log10(max(rangeAzimuth, eps) / max(targetPeak, eps));
 
     fig = figure('Name', 'Range-azimuth profile', 'Position', [160, 150, 700, 480]);
     imagesc(azimuthGrid, rangeAxis(plotMask), rangeAzimuthDb(plotMask, :));

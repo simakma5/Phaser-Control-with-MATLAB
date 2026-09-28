@@ -9,7 +9,9 @@ function fig = plotMimoRangeProfile(rangeResults)
     targetRangeMeas = rangeResults.targetRangeMeas;
 
     fig = figure('Name', 'Calibrated range profile', 'Position', [80, 150, 650, 380]);
-    profileSumDb = 10 * log10(max(combinedPower, eps) / max(combinedPower));
+    searchMask = rangeAxis >= targetRangeGate(1) & rangeAxis <= targetRangeGate(2);
+    gatePeak = max(combinedPower(searchMask));
+    profileSumDb = 10 * log10(max(combinedPower, eps) / max(gatePeak, eps));
     plot(rangeAxis, profileSumDb, 'LineWidth', 1.5);
     hold on;
     xline(targetRangeMeas, '--r', sprintf('Target range: %.2f m', targetRangeMeas), ...

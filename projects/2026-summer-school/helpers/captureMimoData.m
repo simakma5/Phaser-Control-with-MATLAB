@@ -37,6 +37,9 @@ function mimoPulseData = captureMimoData(rx, tx, bf, bf_TDD, fmcwParams, portSwi
             bf.LatchRxSettings();
             pause(0.01);
 
+            % Flush stale Pluto DMA buffer before triggering the burst
+            rx();
+
             rawData = captureTransmitWaveform(rx, tx, bf, txWaveform);
             rawPulseData{iTx, nPair} = arrangeMimoPulseData(rawData, rx, bf, bf_TDD);
         end

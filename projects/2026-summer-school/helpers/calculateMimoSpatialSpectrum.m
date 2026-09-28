@@ -67,22 +67,39 @@ function spatialResults = calculateMimoSpatialSpectrum(rangeResults, arrayParams
     H_tx1_win  = H_tx1 .* w_rx;
     H_virt_win = H_virt .* w_virt;
 
-    % Digital Beamforming (Bartlett spatial spectrum)
+    % Digital beamforming (Bartlett spatial spectrum)
     P_rx_meas   = abs(A_rx_grid' * H_tx1_win).^2;
     P_virt_meas = abs(A_virt_grid' * H_virt_win).^2;
 
     P_rx_meas_db   = norm_db(P_rx_meas);
     P_virt_meas_db = norm_db(P_virt_meas);
 
-    % Automatic AOA Detection from measured 16-element virtual spectrum
-    [detectedAOAs, detectedPowers] = findSpatialPeaks(P_virt_meas_db, azimuthGrid, targetCount, 3.0);
+    % Inspect relative power between transmit channels
+    pTx1 = mean(abs(H_tx1).^2);
+    pTx2 = mean(abs(H_tx2).^2);
+    txRatioDb = 10 * log10(max(pTx2, eps) / max(pTx1, eps));
+    fprintf('Transmit channel 2 / channel 1 power ratio: %.1f dB\n', txRatioDb);
+
+    % Automatic AOA detection:
+    % When both transmit channels have comparable power (>= -10 dB, co-pol MIMO mode),
+    % detect peaks from the higher-resolution 16-element virtual spectrum.
+    % When Tx 2 is heavily attenuated (< -10 dB, rotated cross-pol mode), concatenating
+    % Tx 1 and Tx 2 introduces an artificial aperture step discontinuity; therefore
+    % detect target AOAs from the 8-element physical Rx spectrum (Tx 1).
+    if txRatioDb < -10
+        fprintf('Note: Transmit channel 2 is heavily attenuated (< -10 dB, rotated cross-pol mode).\n');
+        fprintf('Detecting target AOAs from physical Rx array (Tx 1) to avoid aperture discontinuity.\n');
+        [detectedAOAs, detectedPowers] = findSpatialPeaks(P_rx_meas_db, azimuthGrid, targetCount, 3.0);
+    else
+        [detectedAOAs, detectedPowers] = findSpatialPeaks(P_virt_meas_db, azimuthGrid, targetCount, 3.0);
+    end
 
     if isempty(detectedAOAs)
         detectedAOAs = 0.0;
         detectedPowers = 0.0;
     end
 
-    fprintf('Detected Target AOAs: %s deg\n\n', mat2str(round(detectedAOAs, 1)));
+    fprintf('Detected target AOAs: %s deg\n\n', mat2str(round(detectedAOAs, 1)));
 
     % Data-Driven Theoretical Simulated Spatial Spectrum
     detectedAmps = 10.^(detectedPowers / 20);
