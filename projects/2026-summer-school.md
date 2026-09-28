@@ -1,1 +1,0 @@
-/home/martin/Documents/Obsidian Vault/PhD/Courses/MIMO radar summer school 2026.md
