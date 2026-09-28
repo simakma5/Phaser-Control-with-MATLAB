@@ -6,7 +6,7 @@
 %
 % This script is structured into modular sections designed for easy conversion
 % to an interactive MATLAB Live Script (.mlx). All functional, non-interactive
-% logic is encapsulated in standalone functions within this folder.
+% logic is encapsulated in standalone functions within the helpers/ folder.
 %
 % Copyright 2026 Microwave Sensing, Signals and Systems (MS3), TU Delft.
 
@@ -18,16 +18,16 @@ warning('off','MATLAB:system:ObsoleteSystemObjectMixin');
 scriptFolder = fileparts(mfilename('fullpath'));
 if isempty(scriptFolder), scriptFolder = pwd; end
 addpath(scriptFolder);
+addpath(fullfile(scriptFolder, 'helpers'));
 
 % Add repository root shared and demo libraries
-repoRoot = fullfile(scriptFolder, '..', '..', '..');
+repoRoot = fullfile(scriptFolder, '..', '..');
 addpath(genpath(fullfile(repoRoot, 'shared')));
 addpath(genpath(fullfile(repoRoot, 'demos')));
 
 %% 1. Interactive Radar & Processing Controls
 % =========================================================================
 % [LIVE SCRIPT CONTROLS TO CONFIGURE]:
-%   arrayMode     -> Drop-Down: ["2x8_switched", "2x2_subarray"]
 %   dTx_lambda    -> Numeric Edit Field: e.g. 4.0 (1.0 for overlapped, 4.0 for contiguous ULA)
 %   targetCount   -> Numeric Edit Field: integer >= 1 (default: 2)
 %   spatialWindow -> Drop-Down: ["Uniform", "Hann", "Chebyshev"]
@@ -36,9 +36,6 @@ addpath(genpath(fullfile(repoRoot, 'demos')));
 %   calRange      -> Numeric Edit Field (default: 1.6)
 %   targetRangeMin-> Numeric Edit Field / Slider (default: 0.5)
 %   targetRangeMax-> Numeric Edit Field / Slider (default: 5.0)
-
-% Array Mode: '2x8_switched' (16-element virtual ULA) or '2x2_subarray' (4-channel baseline)
-arrayMode = '2x8_switched';
 
 % Transmit antenna separation in wavelengths (lambda)
 %   1.0 -> Overlapped array bracket
@@ -80,7 +77,6 @@ arrayParams.x_tx        = [0, dTx];
 arrayParams.x_virt      = [arrayParams.x_rx, arrayParams.x_rx + dTx];
 arrayParams.dTx_lambda  = dTx_lambda;
 arrayParams.lambda      = lambda;
-arrayParams.arrayMode   = arrayMode;
 
 %% 2. Figure 1: Array Geometry & Spatial Convolution
 % =========================================================================
@@ -97,7 +93,7 @@ cleanupGuard = onCleanup(@() cleanupAntenna(rx, tx, bf, bf_TDD));
 %% 4. Multichannel FMCW Hardware Data Acquisition
 % =========================================================================
 mimoPulseData = captureMimoData( ...
-    rx, tx, bf, bf_TDD, fmcwParams, arrayMode, portSwitchPause);
+    rx, tx, bf, bf_TDD, fmcwParams, portSwitchPause);
 
 %% 5. Figure 2: Precise Range Measurement & Target Detection
 % =========================================================================
@@ -127,3 +123,10 @@ plotMimoSpatialSpectrum(spatialResults);
 %% 7. Figure 4: 2D MIMO Range-Azimuth Map
 % =========================================================================
 plotMimoRangeAzimuth(rangeResults, spatialResults, doaParams);
+
+%% 8. Figure 5: Tx Polarimetric Range Profiles (Co-Pol vs Cross-Pol)
+% =========================================================================
+% Displays all 8 Rx channel range profiles for Tx 1 and Tx 2 side-by-side.
+% When one Tx antenna is rotated by 90 degrees, Subplot 1 shows Co-Pol
+% returns while Subplot 2 shows Cross-Pol returns.
+plotMimoPolarimetricProfiles(rangeResults);

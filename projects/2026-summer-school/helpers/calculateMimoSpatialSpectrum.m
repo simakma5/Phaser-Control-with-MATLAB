@@ -5,14 +5,14 @@ function spatialResults = calculateMimoSpatialSpectrum(rangeResults, arrayParams
 %
 %   Inputs:
 %       rangeResults - Output struct from processMimoRange
-%       arrayParams  - Struct with fields:
-%           x_rx, x_virt, lambda, arrayMode
+%       arrayParams  - Struct with fields: x_rx, x_virt, lambda
 %       doaParams    - Struct with fields:
 %           azimuthGrid   - Azimuth evaluation grid in degrees (e.g. -60:0.5:60)
 %           tx_phase_cal  - Tx phase calibration offset in degrees (default: 0.0)
 %           doaAlgorithm  - 'Bartlett', 'Capon', or 'MUSIC' (default: 'Bartlett')
 %           spatialWindow - 'Uniform', 'Hann', or 'Chebyshev' (default: 'Uniform')
 %           sllChebDb     - Sidelobe level for Chebyshev window in dB (default: -25)
+%           targetCount   - Number of target peaks to detect and simulate (default: 2)
 %
 %   Outputs:
 %       spatialResults - Struct containing:
@@ -41,7 +41,6 @@ function spatialResults = calculateMimoSpatialSpectrum(rangeResults, arrayParams
     x_rx        = arrayParams.x_rx;
     x_virt      = arrayParams.x_virt;
     lambda      = arrayParams.lambda;
-    arrayMode   = arrayParams.arrayMode;
     nRxPhysical = length(x_rx);
     nVirt       = length(x_virt);
 
@@ -56,55 +55,27 @@ function spatialResults = calculateMimoSpatialSpectrum(rangeResults, arrayParams
     w_rx   = getSpatialWindow(doaParams.spatialWindow, nRxPhysical, doaParams.sllChebDb);
     w_virt = getSpatialWindow(doaParams.spatialWindow, nVirt, doaParams.sllChebDb);
 
-    switch arrayMode
-        case '2x8_switched'
-            % Extract complex response across all 8 Rx elements for Tx 1 and Tx 2
-            H_tx1 = squeeze(meanRangeSpectrum(targetBin, :, 1)).'; % 8 x 1
-            H_tx2 = squeeze(meanRangeSpectrum(targetBin, :, 2)).'; % 8 x 1
-            H_tx2_cal = H_tx2 * exp(-1j * deg2rad(tx_phase_cal));
+    % Extract complex response across all 8 Rx elements for Tx 1 and Tx 2
+    H_tx1 = squeeze(meanRangeSpectrum(targetBin, :, 1)).'; % 8 x 1
+    H_tx2 = squeeze(meanRangeSpectrum(targetBin, :, 2)).'; % 8 x 1
+    H_tx2_cal = H_tx2 * exp(-1j * deg2rad(tx_phase_cal));
 
-            % 16-element contiguous virtual array snapshot
-            H_virt = [H_tx1; H_tx2_cal]; % 16 x 1
+    % 16-element contiguous virtual array snapshot
+    H_virt = [H_tx1; H_tx2_cal]; % 16 x 1
 
-            % Apply spatial tapering
-            H_tx1_win  = H_tx1 .* w_rx;
-            H_virt_win = H_virt .* w_virt;
+    % Apply spatial tapering
+    H_tx1_win  = H_tx1 .* w_rx;
+    H_virt_win = H_virt .* w_virt;
 
-            % Digital Beamforming (Bartlett spatial spectrum)
-            P_rx_meas   = abs(A_rx_grid' * H_tx1_win).^2;
-            P_virt_meas = abs(A_virt_grid' * H_virt_win).^2;
+    % Digital Beamforming (Bartlett spatial spectrum)
+    P_rx_meas   = abs(A_rx_grid' * H_tx1_win).^2;
+    P_virt_meas = abs(A_virt_grid' * H_virt_win).^2;
 
-            P_rx_meas_db   = norm_db(P_rx_meas);
-            P_virt_meas_db = norm_db(P_virt_meas);
+    P_rx_meas_db   = norm_db(P_rx_meas);
+    P_virt_meas_db = norm_db(P_virt_meas);
 
-            % Automatic AOA Detection from measured 16-element virtual spectrum
-            [detectedAOAs, detectedPowers] = findSpatialPeaks(P_virt_meas_db, azimuthGrid, targetCount, 3.0);
-
-        case '2x2_subarray'
-            H_sub = squeeze(meanRangeSpectrum(targetBin, :, :)); % 2 Rx x 2 Tx
-            h_vec = H_sub(:); % 4 x 1
-
-            rxSubSpacing = 4 * (lambda / 2);
-            txSubSpacing = 4 * (lambda / 2);
-            rxPosSub = ((0:1) - 0.5) * rxSubSpacing;
-            txPosSub = ((0:1) - 0.5) * txSubSpacing;
-
-            virtPosSub = zeros(4, 1);
-            idx = 0;
-            for iTx = 1:2
-                for iRx = 1:2
-                    idx = idx + 1;
-                    virtPosSub(idx) = txPosSub(iTx) + rxPosSub(iRx);
-                end
-            end
-
-            A_sub_grid = exp(1j * k * virtPosSub * sind(azimuthGrid));
-            P_virt_meas = abs(A_sub_grid' * h_vec).^2;
-            P_virt_meas_db = norm_db(P_virt_meas);
-            P_rx_meas_db = P_virt_meas_db;
-
-            [detectedAOAs, detectedPowers] = findSpatialPeaks(P_virt_meas_db, azimuthGrid, targetCount, 3.0);
-    end
+    % Automatic AOA Detection from measured 16-element virtual spectrum
+    [detectedAOAs, detectedPowers] = findSpatialPeaks(P_virt_meas_db, azimuthGrid, targetCount, 3.0);
 
     if isempty(detectedAOAs)
         detectedAOAs = 0.0;

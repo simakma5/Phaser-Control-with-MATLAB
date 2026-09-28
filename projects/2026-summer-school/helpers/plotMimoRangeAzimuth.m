@@ -12,12 +12,6 @@ function fig = plotMimoRangeAzimuth(rangeResults, spatialResults, doaParams)
     A_virt_grid       = spatialResults.A_virt_grid;
     tx_phase_cal      = doaParams.tx_phase_cal;
 
-    % Only applicable when all 16 virtual elements are present
-    if size(meanRangeSpectrum, 2) < 8
-        fig = [];
-        return;
-    end
-
     channelRangeSpectrum = zeros(numel(rangeAxis), 16);
     channelRangeSpectrum(:, 1:8)  = squeeze(meanRangeSpectrum(:, :, 1));
     channelRangeSpectrum(:, 9:16) = squeeze(meanRangeSpectrum(:, :, 2)) * exp(-1j * deg2rad(tx_phase_cal));
