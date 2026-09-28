@@ -38,22 +38,22 @@ function fig = plotMimoArrayGeometry(arrayParams)
     xlabel('Position along baseline (\lambda)'); ylabel('Active');
     set(gca, 'YTick', [0, 1]);
 
-    % Subplot 3: Synthesised virtual array
+    % Subplot 3: Synthesized virtual array
     subplot(3, 1, 3);
     yMax = max([1.5, max(weights) + 0.5]);
     stem(uPos, weights, 'filled', 'LineWidth', 1.5, 'Color', [0.466 0.674 0.188]);
     xlim([-1, xMax]); ylim([0, yMax]); grid on;
 
     if abs(dTx_lambda - 4.0) < 1e-3
-        title(sprintf('Synthesised virtual array (16 elements contiguous ULA, d = \\lambda/2, aperture: %.1f\\lambda)', max(posLambda)));
+        title(sprintf('Synthesized virtual array (16 elements contiguous ULA, d = \\lambda/2, aperture: %.1f\\lambda)', max(posLambda)));
         ylabel('Active');
         set(gca, 'YTick', [0, 1]);
     elseif dTx_lambda < 4.0
-        title(sprintf('Synthesised virtual array (overlapped aperture: %.1f\\lambda, %d unique positions)', max(posLambda), length(uPos)));
+        title(sprintf('Synthesized virtual array (overlapped aperture: %.1f\\lambda, %d unique positions)', max(posLambda), length(uPos)));
         ylabel('Co-array weight');
         set(gca, 'YTick', 0:max(weights));
     else
-        title(sprintf('Synthesised virtual array (sparse array with grating lobes, aperture: %.1f\\lambda)', max(posLambda)));
+        title(sprintf('Synthesized virtual array (sparse array with grating lobes, aperture: %.1f\\lambda)', max(posLambda)));
         ylabel('Active');
         set(gca, 'YTick', [0, 1]);
     end

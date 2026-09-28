@@ -15,6 +15,6 @@ function fig = plotMimoRangeProfile(rangeResults)
     xline(targetRangeMeas, '--r', sprintf('Target range: %.2f m', targetRangeMeas), ...
           'LabelVerticalAlignment', 'bottom', 'LineWidth', 1.2);
     grid on; xlim(targetRangeGate); ylim([-40, 5]);
-    xlabel('Range (m)'); ylabel('Normalised power (dB)');
+    xlabel('Range (m)'); ylabel('Normalized power (dB)');
     title('Calibrated range profile');
 end

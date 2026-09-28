@@ -11,13 +11,13 @@
 This hands-on laboratory session provides practical experience with the core physical and algorithmic principles of Multiple-Input Multiple-Output (MIMO) radar using the **ADALM-PHASER (CN0566)** kit.
 
 By completing this exercise, participants will be able to:
-1. **Apply spatial convolution:** Synthesise virtual arrays via the spatial convolution of physical transmit ($\mathbf{r}_{\text{Tx}}$) and receive ($\mathbf{r}_{\text{Rx}}$) antenna locations:
+1. **Apply spatial convolution:** Synthesize virtual arrays via the spatial convolution of physical transmit ($\mathbf{r}_{\text{Tx}}$) and receive ($\mathbf{r}_{\text{Rx}}$) antenna locations:
    $$\mathbf{r}_{\text{virt}} = \mathbf{r}_{\text{Tx}} \oplus \mathbf{r}_{\text{Rx}} = \{ \mathbf{r}_t + \mathbf{r}_r \mid \mathbf{r}_t \in \mathcal{T},\, \mathbf{r}_r \in \mathcal{R} \}$$
-2. **Observe the Rayleigh resolution limit:** Contrast the angular resolution of the physical eight-element Rx phased array (aperture $L = 3.5\lambda$, beamwidth $\approx 14.5^\circ$) with that of the synthesised 16-element virtual array ($L = 7.5\lambda$, beamwidth $\approx 6.8^\circ$), demonstrating how closely spaced targets ($\Delta\theta \approx 10^\circ$) transition from an unresolved mainlobe into two cleanly separated peaks.
+2. **Observe the Rayleigh resolution limit:** Contrast the angular resolution of the physical eight-element Rx phased array (aperture $L = 3.5\lambda$, beamwidth $\approx 14.5^\circ$) with that of the synthesized 16-element virtual array ($L = 7.5\lambda$, beamwidth $\approx 6.8^\circ$), demonstrating how closely spaced targets ($\Delta\theta \approx 10^\circ$) transition from an unresolved mainlobe into two cleanly separated peaks.
 3. **Control switched TDM-MIMO hardware:** Understand time-division multiplexed (TDM) switching using the Phaser's on-board microwave switch (`bf.EnableOut1`) and sequential element capture across the two ADAR1000 beamformer chips.
 4. **Evaluate array topologies:** Investigate how varying transmit spacing ($d_{\text{Tx}} = 1.0\lambda$ overlapped vs. $4.0\lambda$ contiguous vs. $> 4.0\lambda$ sparse) affects the virtual aperture, co-array redundancy, and grating lobes.
 5. **Study spatial tapering and coherence:** Experiment with spatial windowing (Uniform vs Hann vs Chebyshev) and analyse how phase discrepancies between transmit paths impact virtual beam synthesis.
-6. **Observe transmit channel returns (polarimetry):** Inspect returns separated by transmit channel. Rotating one transmit Vivaldi antenna by 90° enables simultaneous capture of co-polarised and cross-polarised returns across all eight receive elements, allowing target scattering matrices (e.g. dihedral vs trihedral corner reflectors) to be analysed.
+6. **Observe transmit channel returns (polarimetry):** Inspect returns separated by transmit channel. Rotating one transmit Vivaldi antenna by 90° enables simultaneous capture of co-polarized and cross-polarized returns across all eight receive elements, allowing target scattering matrices (e.g. dihedral vs trihedral corner reflectors) to be analysed.
 
 ---
 
@@ -27,7 +27,7 @@ The script [`mimo_lab.m`](file:///home/martin/Repositories/Phaser-control-with-M
 
 ```
 [1. Array geometry]          -> Computes and plots physical and virtual antenna baselines
-[2. Radar configuration]     -> Initialises PlutoSDR, Phaser ADF4159 PLL, and TDD engine
+[2. Radar configuration]     -> Initializes PlutoSDR, Phaser ADF4159 PLL, and TDD engine
 [3. Data acquisition]        -> Executes eight-burst switched element capture for Tx 1 and Tx 2
 [4. Range processing]        -> Range FFT, coherent pulse averaging, automated target range locking
 [5. Spatial spectrum]        -> Digital beamforming, automated AOA peak finding and data-driven simulation
@@ -35,13 +35,13 @@ The script [`mimo_lab.m`](file:///home/martin/Repositories/Phaser-control-with-M
 [7. Transmit range profiles] -> Overlays all eight Rx channel range profiles for Tx 1 vs Tx 2
 ```
 
-1. **Geometry initialisation:** Determines the physical and virtual coordinate vectors based on $d_{\text{Tx}}$ and plots the three-panel geometry stem figure.
+1. **Geometry initialization:** Determines the physical and virtual coordinate vectors based on $d_{\text{Tx}}$ and plots the three-panel geometry stem figure.
 2. **FMCW radar setup:** Sets bandwidth, sweep time, PRF, and TDD triggers using the verified `setupFMCWRadar` abstraction, discarding the initial DMA buffer.
 3. **Switched single-element data acquisition:** Cycles through four element pairs across the two ADAR1000 chips for Tx 1 and Tx 2 (eight rapid bursts total in ~1–2 seconds), collecting raw snapshots for all 16 virtual channels.
 4. **Range FFT and automated target gating:** Performs fast-time FFT windowed by Hann, averages pulses across the coherent processing interval (CPI), applies the hardware calibration offset ($R = R_{\text{raw}} - \text{calRange}$), and locks onto the reflector range bin within `targetRangeGate`.
-5. **DOA beamforming and data-driven simulation:** Evaluates Bartlett spatial spectra for both physical (8 elements) and virtual (16 elements) arrays, automatically detects target peaks, and synthesises a matched theoretical benchmark for side-by-side display.
+5. **DOA beamforming and data-driven simulation:** Evaluates Bartlett spatial spectra for both physical (8 elements) and virtual (16 elements) arrays, automatically detects target peaks, and synthesizes a matched theoretical benchmark for side-by-side display.
 6. **2D range-azimuth map:** Generates a 2D intensity heatmap across range and azimuth.
-7. **Range profiles by transmit channel:** Displays all eight Rx range profiles for Tx 1 and Tx 2 side by side with a shared normalisation scale (enabling co-pol vs cross-pol observation when Tx 2 is rotated 90°).
+7. **Range profiles by transmit channel:** Displays all eight Rx range profiles for Tx 1 and Tx 2 side by side with a shared normalization scale (enabling co-pol vs cross-pol observation when Tx 2 is rotated 90°).
 
 ---
 
@@ -51,11 +51,11 @@ All non-interactive and hardware-control logic is encapsulated in standalone `.m
 
 | Function file | Primary role and internal operations |
 |:---|:---|
-| [`setupMimoFmcwRadar.m`](file:///home/martin/Repositories/Phaser-control-with-MATLAB/projects/2026-summer-school/helpers/setupMimoFmcwRadar.m) | **Radar configuration:** Derives FMCW sweep slope, PRF, and sampling rate; initialises PlutoSDR and Phaser TDD engine (`Ch2Off = FrameLength * nPulses`); applies broadside phase calibration weights to ADAR1000 chips; flushes initial frame. |
+| [`setupMimoFmcwRadar.m`](file:///home/martin/Repositories/Phaser-control-with-MATLAB/projects/2026-summer-school/helpers/setupMimoFmcwRadar.m) | **Radar configuration:** Derives FMCW sweep slope, PRF, and sampling rate; initializes PlutoSDR and Phaser TDD engine (`Ch2Off = FrameLength * nPulses`); applies broadside phase calibration weights to ADAR1000 chips; flushes initial frame. |
 | [`captureMimoData.m`](file:///home/martin/Repositories/Phaser-control-with-MATLAB/projects/2026-summer-school/helpers/captureMimoData.m) | **Hardware data acquisition:** Selects Tx 1/Tx 2 via `bf.EnableOut1`; cycles `bf.RxPowerDown` across four element pairs (`[1,5]`, `[2,6]`, `[3,7]`, `[4,8]`); captures bursts and arranges them into an `[nFastTime x nPulses x 8 x 2]` tensor. |
 | [`arrangeMimoPulseData.m`](file:///home/martin/Repositories/Phaser-control-with-MATLAB/projects/2026-summer-school/helpers/arrangeMimoPulseData.m) | **Pulse slicing and calibration:** Multiplies raw Pluto channels by digital calibration weights; computes sample offset indices from TDD timing; slices the continuous stream into discrete pulses. |
 | [`processMimoRange.m`](file:///home/martin/Repositories/Phaser-control-with-MATLAB/projects/2026-summer-school/helpers/processMimoRange.m) | **Range profile and gating:** Applies fast-time Hann window; computes next-power-of-2 FFT; coherently integrates chirps; applies `calRange = 1.6 m` offset; sums power across all channels to detect the target range bin. |
-| [`calculateMimoSpatialSpectrum.m`](file:///home/martin/Repositories/Phaser-control-with-MATLAB/projects/2026-summer-school/helpers/calculateMimoSpatialSpectrum.m) | **Spatial processing and AOA detection:** Extracts complex envelopes at the target range bin; applies spatial tapering (Uniform/Hann/Chebyshev); computes measured Bartlett spectra; detects target AOAs via `findSpatialPeaks`; synthesises data-driven theoretical response. |
+| [`calculateMimoSpatialSpectrum.m`](file:///home/martin/Repositories/Phaser-control-with-MATLAB/projects/2026-summer-school/helpers/calculateMimoSpatialSpectrum.m) | **Spatial processing and AOA detection:** Extracts complex envelopes at the target range bin; applies spatial tapering (Uniform/Hann/Chebyshev); computes measured Bartlett spectra; detects target AOAs via `findSpatialPeaks`; synthesizes data-driven theoretical response. |
 | [`findSpatialPeaks.m`](file:///home/martin/Repositories/Phaser-control-with-MATLAB/projects/2026-summer-school/helpers/findSpatialPeaks.m) | **Peak detection utility:** Identifies local maxima in spatial spectra with specified minimum prominence (3 dB) and angular separation (4°), locking up to `targetCount` targets. |
 | [`plotMimoArrayGeometry.m`](file:///home/martin/Repositories/Phaser-control-with-MATLAB/projects/2026-summer-school/helpers/plotMimoArrayGeometry.m) | **Figure 1:** Three-panel stem plot of physical Rx ($8\times \lambda/2$), physical Tx ($2\times d_{\text{Tx}}$), and virtual array (including co-array redundancy weights and dynamic aperture scaling). |
 | [`plotMimoRangeProfile.m`](file:///home/martin/Repositories/Phaser-control-with-MATLAB/projects/2026-summer-school/helpers/plotMimoRangeProfile.m) | **Figure 2:** Calibrated range profile with an automated red marker indicating the detected reflector distance. |
@@ -96,7 +96,7 @@ targetRangeGate = [0.5, 5.0];% Target search interval (m)
 4. **Tx phase errors:** Adjust `tx_phase_cal` using the slider. Observe how non-zero phase mismatches between the two transmit paths degrade virtual array coherence, introducing beam splitting and grating lobes.
 5. **Transmit channel separation and polarimetry:** Rotate the Tx 2 Vivaldi antenna by 90° relative to Tx 1. Observe Figure 5:
    - For a trihedral corner reflector (co-pol preserving), Tx 1 produces strong returns while Tx 2 is attenuated.
-   - For a dihedral reflector rotated at 45° (polarisation rotating), Tx 2 exhibits strong cross-pol conversion.
+   - For a dihedral reflector rotated at 45° (polarization rotating), Tx 2 exhibits strong cross-pol conversion.
 
 ---
 
@@ -109,6 +109,6 @@ targetRangeGate = [0.5, 5.0];% Target search interval (m)
 3. **Grating lobes in sparse arrays:**
    - If the two transmitters are placed at $d_{\text{Tx}} = 5.0\lambda$ (leaving a $1.0\lambda$ hole between the subarrays), at what azimuth angles do grating lobes appear?
 4. **TDM coherence constraints:**
-   - What happens to the synthesised virtual array response if a target moves radially during the eight-burst switching sequence? Calculate the Doppler phase shift $\Delta\phi = 4\pi v \Delta t / \lambda$ for a velocity of $0.5\text{ m/s}$ with a switching delay of $\Delta t = 100\text{ ms}$.
+   - What happens to the synthesized virtual array response if a target moves radially during the eight-burst switching sequence? Calculate the Doppler phase shift $\Delta\phi = 4\pi v \Delta t / \lambda$ for a velocity of $0.5\text{ m/s}$ with a switching delay of $\Delta t = 100\text{ ms}$.
 5. **Polarimetric scattering:**
-   - In Figure 5, compare the signal level at the target range bin between Tx 1 and Tx 2. What is the measured cross-polarisation ratio (XPR in dB)? How does this align with the theoretical scattering matrix of the target reflector?
+   - In Figure 5, compare the signal level at the target range bin between Tx 1 and Tx 2. What is the measured cross-polarization ratio (XPR in dB)? How does this align with the theoretical scattering matrix of the target reflector?

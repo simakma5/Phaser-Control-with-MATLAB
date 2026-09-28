@@ -21,7 +21,7 @@ function fig = plotMimoSpatialSpectrum(spatialResults)
               'LabelVerticalAlignment', 'top', 'HandleVisibility', 'off');
     end
     grid on; xlim([min(azimuthGrid), max(azimuthGrid)]); ylim([-35, 2]);
-    xlabel('Azimuth angle (deg)'); ylabel('Normalised power (dB)');
+    xlabel('Azimuth angle (deg)'); ylabel('Normalized power (dB)');
     title(sprintf('Simulated spectrum (AOAs: %s^\\circ)', mat2str(round(detectedAOAs, 1))));
     legend('Location', 'south');
 
@@ -34,7 +34,7 @@ function fig = plotMimoSpatialSpectrum(spatialResults)
               'LabelVerticalAlignment', 'top', 'HandleVisibility', 'off');
     end
     grid on; xlim([min(azimuthGrid), max(azimuthGrid)]); ylim([-35, 2]);
-    xlabel('Azimuth angle (deg)'); ylabel('Normalised power (dB)');
+    xlabel('Azimuth angle (deg)'); ylabel('Normalized power (dB)');
     title('Measured spatial spectrum');
     legend('Location', 'south');
 end

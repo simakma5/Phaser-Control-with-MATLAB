@@ -5,7 +5,7 @@ function fig = plotMimoTxRangeProfiles(rangeResults)
 %
 %   Generates a two-panel comparison figure displaying the eight receive channel
 %   range profiles for transmit channel 1 (SMA out 1) and transmit channel 2
-%   (SMA out 2). Both panels share a common normalisation reference to preserve
+%   (SMA out 2). Both panels share a common normalization reference to preserve
 %   relative power differences between transmit channels, enabling observations
 %   such as polarimetric co-pol and cross-pol comparisons when one transmit
 %   antenna is rotated by 90 degrees.

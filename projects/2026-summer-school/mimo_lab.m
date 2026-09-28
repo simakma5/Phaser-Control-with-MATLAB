@@ -1,6 +1,6 @@
 %% MIMO radar summer school 2026 - contiguous virtual ULA (2x8 MIMO)
 %
-% Synthesises a 16-element contiguous virtual uniform linear array (ULA) from 
+% Synthesizes a 16-element contiguous virtual uniform linear array (ULA) from 
 % an eight-element physical Rx array (ADALM-PHASER) and two electronically switched 
 % transmit antennas (SMA out 1 and out 2 spaced by 4*lambda).
 %
@@ -13,7 +13,7 @@
 clear; close all; clc;
 warning('off','MATLAB:system:ObsoleteSystemObjectMixin');
 
-%% 0. Environment setup and path initialisation
+%% 0. Environment setup and path initialization
 % =========================================================================
 scriptFolder = fileparts(mfilename('fullpath'));
 if isempty(scriptFolder), scriptFolder = pwd; end
@@ -80,8 +80,8 @@ arrayParams.lambda      = lambda;
 
 %% 2. Figure 1: Array geometry and spatial convolution
 % =========================================================================
-% Visualises physical Rx (8 elements), physical Tx (2 elements), and the
-% synthesised contiguous 16-element virtual ULA.
+% Visualizes physical Rx (8 elements), physical Tx (2 elements), and the
+% synthesized contiguous 16-element virtual ULA.
 plotMimoArrayGeometry(arrayParams);
 
 %% 3. Radar hardware configuration
@@ -128,5 +128,5 @@ plotMimoRangeAzimuth(rangeResults, spatialResults, doaParams);
 % =========================================================================
 % Displays all eight Rx channel range profiles for Tx 1 and Tx 2 side by side.
 % Rotating one transmit antenna by 90 degrees enables polarimetric
-% observation (co-polarised and cross-polarised returns).
+% observation (co-polarized and cross-polarized returns).
 plotMimoTxRangeProfiles(rangeResults);
