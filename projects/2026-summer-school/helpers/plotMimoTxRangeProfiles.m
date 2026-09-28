@@ -1,13 +1,14 @@
-function fig = plotMimoPolarimetricProfiles(rangeResults)
-% PLOTMIMOPOLARIMETRICPROFILES Plot all 8 Rx range profiles for each Tx side-by-side.
+function fig = plotMimoTxRangeProfiles(rangeResults)
+% PLOTMIMOTXRANGEPROFILES Plot all eight receive range profiles for each transmit channel.
 %
-%   fig = plotMimoPolarimetricProfiles(rangeResults)
+%   fig = plotMimoTxRangeProfiles(rangeResults)
 %
-%   Generates a 2-panel comparison figure displaying the 8 Rx channel range
-%   profiles for Tx 1 (SMA Out 1) and Tx 2 (SMA Out 2). This facilitates
-%   polarimetric observation when one Tx antenna is rotated by 90 degrees
-%   (e.g., Tx 1 = Co-Pol, Tx 2 = Cross-Pol). Both panels share a common
-%   normalization reference to preserve the relative power difference.
+%   Generates a two-panel comparison figure displaying the eight receive channel
+%   range profiles for transmit channel 1 (SMA out 1) and transmit channel 2
+%   (SMA out 2). Both panels share a common normalisation reference to preserve
+%   relative power differences between transmit channels, enabling observations
+%   such as polarimetric co-pol and cross-pol comparisons when one transmit
+%   antenna is rotated by 90 degrees.
 
     rangeAxis       = rangeResults.rangeAxis;
     meanRangePower  = rangeResults.meanRangePower;
@@ -17,10 +18,10 @@ function fig = plotMimoPolarimetricProfiles(rangeResults)
     searchMask = rangeAxis >= targetRangeGate(1) & rangeAxis <= targetRangeGate(2);
     globalPeakPower = max(meanRangePower(searchMask, :, :), [], 'all');
 
-    fig = figure('Name', 'Tx Polarimetric Range Profiles (All 8 Rx Channels)', ...
+    fig = figure('Name', 'Range profiles by transmit channel', ...
                  'Position', [80, 100, 1300, 520]);
 
-    % Subplot 1: Tx 1 (SMA Out 1) - Co-Pol / H
+    % Subplot 1: Transmit channel 1 (SMA out 1)
     subplot(1, 2, 1);
     hold on;
     for iRx = 1:8
@@ -33,11 +34,11 @@ function fig = plotMimoPolarimetricProfiles(rangeResults)
     xlim(targetRangeGate);
     ylim([-50, 5]);
     xlabel('Range (m)');
-    ylabel('Relative Power (dB)');
-    title('Tx 1 (SMA Out 1) - All 8 Rx Channels (Co-Pol)');
+    ylabel('Relative power (dB)');
+    title('Transmit channel 1 (SMA out 1)');
     legend('Location', 'northeast', 'NumColumns', 2);
 
-    % Subplot 2: Tx 2 (SMA Out 2) - Cross-Pol / V (Rotated 90 deg)
+    % Subplot 2: Transmit channel 2 (SMA out 2)
     subplot(1, 2, 2);
     hold on;
     for iRx = 1:8
@@ -50,7 +51,7 @@ function fig = plotMimoPolarimetricProfiles(rangeResults)
     xlim(targetRangeGate);
     ylim([-50, 5]);
     xlabel('Range (m)');
-    ylabel('Relative Power (dB)');
-    title('Tx 2 (SMA Out 2) - All 8 Rx Channels (Cross-Pol)');
+    ylabel('Relative power (dB)');
+    title('Transmit channel 2 (SMA out 2)');
     legend('Location', 'northeast', 'NumColumns', 2);
 end

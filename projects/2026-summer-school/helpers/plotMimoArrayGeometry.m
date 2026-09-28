@@ -20,40 +20,40 @@ function fig = plotMimoArrayGeometry(arrayParams)
 
     xMax = max([9, ceil(max(posLambda) + 1)]);
 
-    fig = figure('Name', 'MIMO Array Geometry', 'Position', [80, 100, 950, 500]);
+    fig = figure('Name', 'MIMO array geometry', 'Position', [80, 100, 950, 500]);
 
-    % Subplot 1: Physical Rx Array
+    % Subplot 1: Physical Rx array
     subplot(3, 1, 1);
     stem(x_rx / lambda, ones(1, nRxPhysical), 'filled', 'LineWidth', 1.5, 'Color', [0 0.447 0.741]);
     xlim([-1, xMax]); ylim([0, 1.5]); grid on;
-    title('Physical Rx Array (8 elements, d = \lambda/2, aperture: 3.5\lambda)');
+    title('Physical Rx array (8 elements, d = \lambda/2, aperture: 3.5\lambda)');
     xlabel('Position along baseline (\lambda)'); ylabel('Active');
     set(gca, 'YTick', [0, 1]);
 
-    % Subplot 2: Physical Tx Positions
+    % Subplot 2: Physical Tx positions
     subplot(3, 1, 2);
     stem(x_tx / lambda, ones(1, 2), 'filled', 'LineWidth', 1.5, 'Color', [0.85 0.325 0.098]);
     xlim([-1, xMax]); ylim([0, 1.5]); grid on;
-    title(sprintf('Physical Tx Positions (2 Vivaldi antennas, d_{Tx} = %.2f\\lambda)', dTx_lambda));
+    title(sprintf('Physical Tx positions (2 Vivaldi antennas, d_{Tx} = %.2f\\lambda)', dTx_lambda));
     xlabel('Position along baseline (\lambda)'); ylabel('Active');
     set(gca, 'YTick', [0, 1]);
 
-    % Subplot 3: Synthesized Virtual Array
+    % Subplot 3: Synthesised virtual array
     subplot(3, 1, 3);
     yMax = max([1.5, max(weights) + 0.5]);
     stem(uPos, weights, 'filled', 'LineWidth', 1.5, 'Color', [0.466 0.674 0.188]);
     xlim([-1, xMax]); ylim([0, yMax]); grid on;
 
     if abs(dTx_lambda - 4.0) < 1e-3
-        title(sprintf('Synthesized Virtual Array (16 elements contiguous ULA, d = \\lambda/2, aperture: %.1f\\lambda)', max(posLambda)));
+        title(sprintf('Synthesised virtual array (16 elements contiguous ULA, d = \\lambda/2, aperture: %.1f\\lambda)', max(posLambda)));
         ylabel('Active');
         set(gca, 'YTick', [0, 1]);
     elseif dTx_lambda < 4.0
-        title(sprintf('Synthesized Virtual Array (Overlapped aperture: %.1f\\lambda, %d unique positions)', max(posLambda), length(uPos)));
-        ylabel('Co-array Weight');
+        title(sprintf('Synthesised virtual array (overlapped aperture: %.1f\\lambda, %d unique positions)', max(posLambda), length(uPos)));
+        ylabel('Co-array weight');
         set(gca, 'YTick', 0:max(weights));
     else
-        title(sprintf('Synthesized Virtual Array (Sparse array with grating lobes, aperture: %.1f\\lambda)', max(posLambda)));
+        title(sprintf('Synthesised virtual array (sparse array with grating lobes, aperture: %.1f\\lambda)', max(posLambda)));
         ylabel('Active');
         set(gca, 'YTick', [0, 1]);
     end

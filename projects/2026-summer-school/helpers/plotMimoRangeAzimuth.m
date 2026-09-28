@@ -1,5 +1,5 @@
 function fig = plotMimoRangeAzimuth(rangeResults, spatialResults, doaParams)
-% PLOTMIMORANGEAZIMUTH Generate 2D Range-Azimuth heatmap across the 16 virtual channels.
+% PLOTMIMORANGEAZIMUTH Generate 2D range-azimuth heatmap across the 16 virtual channels.
 %
 %   fig = plotMimoRangeAzimuth(rangeResults, spatialResults, doaParams)
 
@@ -21,13 +21,13 @@ function fig = plotMimoRangeAzimuth(rangeResults, spatialResults, doaParams)
 
     plotMask = rangeAxis >= targetRangeGate(1) & rangeAxis <= targetRangeGate(2);
 
-    fig = figure('Name', 'Range-Azimuth Profile', 'Position', [160, 150, 700, 480]);
+    fig = figure('Name', 'Range-azimuth profile', 'Position', [160, 150, 700, 480]);
     imagesc(azimuthGrid, rangeAxis(plotMask), rangeAzimuthDb(plotMask, :));
     set(gca, 'YDir', 'normal');
     colormap(jet);
-    cb = colorbar; cb.Label.String = 'Relative Power (dB)';
+    cb = colorbar; cb.Label.String = 'Relative power (dB)';
     caxis([-30, 0]);
-    xlabel('Azimuth Angle (deg)'); ylabel('Range (m)');
-    title('MIMO Range-Azimuth Map (16 Virtual Elements)');
+    xlabel('Azimuth angle (deg)'); ylabel('Range (m)');
+    title('MIMO range-azimuth map (16 virtual elements)');
     grid on;
 end
