@@ -1,0 +1,213 @@
+
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=20mm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,booktabs,tabularx,enumitem,xcolor}
+\usepackage{fancyhdr}
+\usepackage{graphicx}
+\usepackage[colorlinks=true,urlcolor=blue!50!black,linkcolor=blue!50!black]{hyperref}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5pt}
+\setlist[enumerate]{leftmargin=*,itemsep=3pt,topsep=3pt}
+\setlist[itemize]{leftmargin=*,itemsep=2pt,topsep=3pt}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{MIMO Radar Laboratory}
+\fancyhead[R]{ADALM-PHASER / MATLAB}
+\fancyfoot[C]{\thepage}
+\setlength{\headheight}{14pt}
+\newcommand{\task}[2]{\subsection*{Task #1 -- #2}}
+\newcommand{\deliver}[1]{\par\textbf{Record:} #1\par}
+\begin{document}
+\begin{center}
+
+{\LARGE\bfseries MIMO Radar Project with ADALM-PHASER\\[6pt]}
+
+\end{center}
+
+\textbf{Aim.} Understand how a practical radar acquires MIMO data, predict its
+angular response using an ideal virtual array, and explain how real targets,
+hardware, and polarization affect the measured responses.
+
+\begin{tabularx}{\textwidth}{@{}lXr@{}}
+\toprule
+Part & Activity \\
+\midrule
+1 & Understand the PHASER setup in MIMO \\
+2 & Complete and investigate an ideal MIMO simulation  \\
+3 & Measure reflectors and investigate polarization \\
+\bottomrule
+\end{tabularx}
+
+\textbf{Provided.} A configured PHASER/Pluto system with two external TX antennas; measurement code; a dihedral, a trihedral, and a metal plate. Note that the targets might need to be shared between groups due to limited amounts.
+
+
+\section{Understand the PHASER setup under the MIMO operation mode}
+
+In this project we apply time-division multiplexing (TDM) between Tx1 and Tx2 to realize a $2\times 8$ MIMO virtual array; the two transmit sweeps are electronically switched rather than hardware-synchronized, so the FMCW ramp start phase is not strictly identical between them, but for a stationary target this residual phase mismatch is small and its impact on the DoA estimate remains within acceptable error. Rather than grouping elements into subarrays, the ADALM-PHASER's eight physical receive patch antennas are individually measured using high-speed element-pair switching across the two ADAR1000 beamformer chips.
+
+\task{1.1}{Identify the available topology}
+Inspect the hardware and the measurement script (\texttt{helpers/mimo\_lab\_plain.m}). Draw a labelled diagram showing the two TX Vivaldi antennas and the eight-element RX array. Answer:
+\begin{enumerate}
+\item How many physical TX and RX channels are available, and how many virtual channels does their combination synthesize?
+\item What changes in terms of aperture length and angular resolution when only one TX is used?
+\item Measure the RX element spacing $d_R$ in wavelengths ($\lambda$) and assume TX separation $d_T=4\lambda$. What total virtual aperture length does this synthesize?
+\item Write down the nominal polarizations of the TX Vivaldi antennas and the RX patch array.
+\end{enumerate}
+
+
+
+\section{Ideal virtual-array simulation}
+
+The response of a MIMO radar can be modeled by an equivalent virtual array topology.
+
+\task{2.1}{Plot the MIMO geometry and virtual array positions}
+Write a MATLAB script to plot the physical and virtual positions. For the reference arrangement
+$d_T=8d_R=4\lambda$ (with $d_R=\lambda/2$), verify that the 16 virtual positions are contiguous and uniformly
+spaced ($d=\lambda/2$, aperture $7.5\lambda$). Discuss what happens to the virtual array if the distance between TXs changes.
+
+\textbf{Hints.}
+\begin{itemize}
+\item Use \texttt{phased.IsotropicAntennaElement} and \texttt{phased.ULA}
+to create the RX array. Use \texttt{getElementPosition} to obtain a
+$3\times N$ matrix of element coordinates in meters; each column is $[x;y;z]$.
+\item Calculate every TX--RX sum position,
+$\mathbf r_{\mathrm V,mn}=\mathbf r_{\mathrm T,m}+\mathbf r_{\mathrm R,n}$.
+Pass these positions to the \texttt{ElementPosition} property of
+\texttt{phased.ConformalArray}.
+\item Use \texttt{viewArray} or \texttt{plot} to display the geometry.
+\end{itemize}
+
+\task{2.2}{Simulate target response using array factor}
+Write your own script. First, assume a one-point target at broadside. Plot the target response, and measure the
+$-3$ dB beamwidth. Next, place two point targets at the same range but different azimuths. Plot the targets response. Vary their angular separation and describe when two peaks are distinguishable.
+
+\textbf{Hints.}
+\begin{itemize}
+\item Use \texttt{phased.ConformalArray} to create an antenna array (virtual array) with element positions that you specify.
+\item Use \texttt{phased.SteeringVector} to calculate the relative phase response of each array element to a signal arriving from a specified direction.
+\item You can also use MATLAB's built-in \texttt{pattern()} function on your array object to directly compute and plot the array response.
+\item For two targets, set the complex amplitudes to $\alpha_1=\alpha_2=1$.
+Add the complex channel responses before calculating power:
+\[
+\mathbf z=\sum_q\alpha_q\mathbf a(\theta_q),\qquad
+P(\theta)=\left|\frac{\mathbf a(\theta)^H\mathbf z}{N}\right|^2,
+\]
+where $\mathbf a$ is the steering vector and $N$ is the number of virtual
+channels.
+\end{itemize}
+
+\task{2.3}{Reduce the number of transmitters}
+Repeat task 2.2 with TX1 only. Compare beamwidth and two-target separation.
+
+\textbf{Hints.} Retain only the virtual channels associated with TX1 and
+recalculate the steering vectors. Keep target angles, complex amplitudes, RX
+positions, scan grid, and weighting unchanged. Normalize each power curve to
+its own peak and overlay the one-TX and two-TX results in the plots.
+
+\task{2.4}{Change the TX spacing}
+Repeat tasks 2.1 and 2.2 with different TX spacing $d_T=2d_R$, $8d_R$, and $12d_R$ ($1\lambda$, $4\lambda$, and $6\lambda$).
+Compare the virtual array topology and target response with the reference case ($d_T=8d_R=4\lambda$). Explain why increasing the distance between TXs narrows the main lobe, and discuss when grating lobes appear.
+
+
+
+\section{PHASER measurements and polarimetric MIMO}
+
+\task{3.1}{Establish the measurement}
+Open the supplied Live Script (\texttt{mimo\_lab.mlx}, or its plain-text reference \texttt{helpers/mimo\_lab\_plain.m}). Start with both TX antennas aligned with the RX polarization (horizontal co-polarized) and place a single stationary corner reflector at a known distance and azimuth.
+
+Configure the radar and processing controls in Section~1 of the script:
+\begin{enumerate}
+\item Set the TX antenna separation: \texttt{dTx\_lambda = 4.0} (corresponding to the $4\lambda$ contiguous ULA bracket).
+\item Set the range search gate: \texttt{targetRangeGate = [0.5, 5.0]} (m).
+\item Set the expected target count: \texttt{targetCount = 1}.
+\item Calibrate the hardware range offset \texttt{calRange}: measure the raw peak distance of the known reflector and set $\texttt{calRange} = R_{\text{raw}} - R_{\text{true}}$ (default is 1.6~m).
+\end{enumerate}
+
+Run the script and inspect \textbf{Figure~2} (\textit{Calibrated range profile}) and \textbf{Figure~1} (\textit{MIMO array geometry}). Verify that the detected target distance matches the physical position and that broadside azimuth alignment is centered near $0^\circ$.
+
+\task{3.2}{Compare real reflectors with the ideal model}
+Measure a trihedral, dihedral, and metal plate in turn at recorded positions and orientations. For each target, run the measurement script and inspect the output figures:
+\begin{itemize}
+\item \textbf{Figure~4 (Range--azimuth profile):} 2D heatmap showing target response across range and azimuth.
+\item \textbf{Figure~3 (Spatial spectrum comparison, right panel):} Measured spatial spectrum cut at the target range bin, comparing the 8-element physical RX array (TX1 only, $3.5\lambda$ aperture) with the synthesized 16-element virtual array ($7.5\lambda$ aperture).
+\item \textbf{Figure~3 (Simulated benchmark, left panel):} Theoretical spatial spectrum synthesized from the ideal array factor (matching your simulation in Part~2) at the detected target angle. Compare measured beamwidth, sidelobe levels, and angle accuracy against this benchmark.
+\item \textbf{Figure~5 (Range profiles by transmit channel):} All 16 virtual channel range profiles, grouped into TX1 (channels 1--8) and TX2 (channels 9--16) on a shared relative power scale.
+\end{itemize}
+
+Experiment with spatial windowing (\texttt{spatialWindow = 'Hann'} or \texttt{'Chebyshev'} with \texttt{sllChebDb}) and TX phase calibration (\texttt{tx\_phase\_cal}) in the script controls to observe their effect on sidelobes and virtual array phase coherence.
+
+Explain any discrepancies between the ideal model and measurements using evidence from your data. Consider channel gain and phase errors, element mutual coupling, antenna beam patterns, finite target dimensions, specular reflection, laboratory multipath, and drift during sequential switching. Assess the far-field boundary ($2D^2/\lambda$) using the physical aperture and target size; if needed, compare exact TX--target--RX path lengths with the plane-wave model. Do not treat every reflector as an isotropic point scatterer or infer an absolute radar cross section from uncalibrated amplitudes.
+
+\task{3.3}{Change the transmitted polarization}
+Keep TX1 aligned with the RX polarization (horizontal). Rotate TX2 by $90^\circ$ about its boresight axis to make its linear polarization orthogonal (vertical), keeping its pointing direction unchanged.
+
+Write down the polarization of each virtual channel: channels 1--8 (TX1 $\to$ RX) probe the co-polarized return ($S_{HH}$), while channels 9--16 (TX2 $\to$ RX) probe the cross-polarized return ($S_{HV}$).
+
+Place the trihedral and dihedral corner reflectors in the scene at distinct distances and azimuth angles, and perform measurements for:
+\begin{enumerate}
+    \item trihedral + dihedral with roll angle $\theta_r = 0^\circ$ (aligned).
+    \item trihedral + dihedral with roll angle $\theta_r = 45^\circ$ (tilted).
+\end{enumerate}
+
+Inspect \textbf{Figure~5} (\textit{Range profiles by transmit channel}) and \textbf{Figure~4} (\textit{Range--azimuth map}):
+\begin{itemize}
+\item In Figure~5, compare how returns distribute between Subplot~1 (TX1, co-pol) and Subplot~2 (TX2, cross-pol). Can you still observe the dihedral in TX1 when $\theta_r = 45^\circ$? Where does its scattered energy appear, and why?
+\item In Figure~3, notice that when TX2 is cross-polarized (power ratio $<-10$~dB), the script automatically detects target angles from the physical RX array to avoid virtual aperture discontinuity artifacts.
+\item \textbf{Tip for multiple targets at different distances:} The range processor locks to the dominant reflector in the range gate. To inspect the spatial spectrum cut (Figure~3) of the second reflector, narrow \texttt{targetRangeGate} in Section~1 to bracket its distance, and re-run Sections~5--6 without re-capturing data.
+\end{itemize}
+
+
+\newpage
+\subsection*{Polarization model for interpreting Task~3.3}
+Use the convention that the first subscript denotes receive polarization and
+the second denotes transmit polarization:
+\[
+\begin{bmatrix}E_H^{\mathrm{rx}}\\E_V^{\mathrm{rx}}\end{bmatrix}
+=\underbrace{\begin{bmatrix}S_{HH}&S_{HV}\\S_{VH}&S_{VV}\end{bmatrix}}_{\mathbf S}
+\begin{bmatrix}E_H^{\mathrm{tx}}\\E_V^{\mathrm{tx}}\end{bmatrix}.
+\]
+For fixed H-polarized RX elements, H- and V-polarized TX antennas probe
+$S_{HH}$ and $S_{HV}$, respectively. If the RX polarization is V, the accessible
+terms are $S_{VH}$ and $S_{VV}$. Define H and V consistently for the actual setup.
+Changing TX polarization alone does not measure the full scattering matrix.
+
+For ideal, suitably aligned reflectors in the monostatic backscatter convention,
+the following normalized matrices provide a qualitative reference, up to a
+complex scale factor:
+\[
+\mathbf S_{\mathrm{trihedral}}\propto
+\begin{bmatrix}1&0\\0&1\end{bmatrix},\qquad
+\mathbf S_{\mathrm{dihedral}}(0)\propto
+\begin{bmatrix}1&0\\0&-1\end{bmatrix}.
+\]
+Rolling the ideal dihedral through angle $\theta_r$ rotates its polarization basis.
+In a consistent choice of roll sign,
+\[
+\mathbf S_{\mathrm{dihedral}}(\theta_r)\propto
+\begin{bmatrix}
+\cos(2\theta_r)&\sin(2\theta_r)\\
+\sin(2\theta_r)&-\cos(2\theta_r)
+\end{bmatrix}.
+\]
+
+\begin{figure}[h!]
+    \centering
+    \includegraphics[width=.5\linewidth]{DH_model_00_45_90.png}
+    \caption{Dihedral self-rotation ($\theta_r$).}
+    \label{fig:DH_self_rotate}
+    %\vspace{-3mm}
+\end{figure}
+
+Predict the co- and cross-polarized responses at $\theta_r=0^\circ$ and $45^\circ$
+before comparing with the measurements. Both aligned ideal reflectors can have
+weak cross-polarized returns; a dihedral is not necessarily bright in cross
+polarization. The ideal HH--VV phase difference cannot be verified directly
+with only one fixed RX polarization. Real geometry, finite reflectors, leakage,
+and multipath can depart from these ideal predictions.
+
+
+
+
+\end{document}

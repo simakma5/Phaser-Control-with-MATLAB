@@ -18,55 +18,86 @@ warning('off','MATLAB:system:ObsoleteSystemObjectMixin');
 scriptFolder = fileparts(mfilename('fullpath'));
 if isempty(scriptFolder), scriptFolder = pwd; end
 addpath(scriptFolder);
-addpath(fullfile(scriptFolder, 'helpers'));
+if exist(fullfile(scriptFolder, 'helpers'), 'dir')
+    addpath(fullfile(scriptFolder, 'helpers'));
+end
 
-% Add repository root shared and demo libraries
-repoRoot = fullfile(scriptFolder, '..', '..');
+% Locate repository root containing 'shared' and 'demos'
+curr = scriptFolder;
+while ~exist(fullfile(curr, 'shared'), 'dir') && ~strcmp(curr, fileparts(curr))
+    curr = fileparts(curr);
+end
+repoRoot = curr;
 addpath(genpath(fullfile(repoRoot, 'shared')));
 addpath(genpath(fullfile(repoRoot, 'demos')));
 
 %% 1. Interactive radar and processing controls
 % =========================================================================
-% [Live script controls to configure]:
-%   dTx_lambda    -> Numeric edit field: e.g. 4.0 (1.0 for overlapped, 4.0 for contiguous ULA)
-%   targetCount   -> Numeric edit field: integer >= 1 (default: 2)
-%   spatialWindow -> Drop-down: ["Uniform", "Hann", "Chebyshev"]
-%   sllChebDb     -> Slider / numeric: [-40, -15] step 1 (default: -25)
-%   tx_phase_cal  -> Slider: [-180, 180] step 5 (default: 0.0)
-%   calRange      -> Numeric edit field (default: 1.6)
-%   targetRangeMin-> Numeric edit field / slider (default: 0.5)
-%   targetRangeMax-> Numeric edit field / slider (default: 5.0)
+% In MATLAB Live Script (.mlx), configure each variable below using an
+% interactive control (slider, numeric edit field, or drop-down menu).
+%
+% [Live script controls]:
+%   --- 1.1 Radar Waveform & Kinematics (Hardware Controls) ---
+%   maxRange        -> Slider / Numeric: [2, 30] m, step 1 (default: 10)
+%   rangeResolution -> Slider / Numeric: [0.08, 0.50] m, step 0.01 (default: 0.10)
+%   maxSpeed        -> Slider / Numeric: [1.0, 15.0] m/s, step 0.5 (default: 5.0)
+%   speedResolution -> Drop-down / Slider: [0.2, 0.25, 0.5, 1.0, 2.0] m/s (default: 0.5)
+%
+%   --- 1.2 Array Geometry & Virtual Synthesis Controls ---
+%   dTx_lambda      -> Numeric / Slider: [1.0, 8.0], step 0.5 (default: 4.0)
+%
+%   --- 1.3 Calibration & Range Gating Controls ---
+%   calRange        -> Numeric edit field: [0.0, 5.0] m, step 0.05 (default: 1.6)
+%   targetRangeMin  -> Slider / Numeric: [0.1, 10.0] m, step 0.1 (default: 0.5)
+%   targetRangeMax  -> Slider / Numeric: [0.5, 15.0] m, step 0.1 (default: 5.0)
+%
+%   --- 1.4 AOA Detection & Spatial Beamforming Controls ---
+%   targetCount     -> Numeric / Slider: integer [1, 5], step 1 (default: 2)
+%   spatialWindow   -> Drop-down: ["Uniform", "Hann", "Chebyshev"] (default: 'Uniform')
+%   sllChebDb       -> Slider / Numeric: [-45, -15] dB, step 1 (default: -25)
+%   tx_phase_cal    -> Slider: [-180, 180] deg, step 5 (default: 0.0)
+%
+% NOTE ON LIVE SCRIPT WORKFLOW:
+%   - Modifying Hardware Controls (maxRange, rangeResolution, maxSpeed,
+%     speedResolution) requires re-running from Section 3 (Hardware Config)
+%     and Section 4 (Data Acquisition).
+%   - Modifying Post-Processing Controls (targetRangeGate, targetCount,
+%     spatialWindow, sllChebDb, tx_phase_cal) can be evaluated immediately
+%     by re-running Sections 5 through 8 without re-acquiring data!
 
-% Transmit antenna separation in wavelengths (lambda)
+% 1.1 Radar waveform and kinematics controls (Hardware)
+maxRange = 10;                  % Maximum instrumented range (m), bounds: [2, 30]
+rangeResolution = 0.10;         % Desired range resolution (m), bounds: [0.08, 0.50]
+maxSpeed = 5.0;                 % Maximum unambiguous speed (m/s), bounds: [1.0, 15.0]
+speedResolution = 0.5;          % Speed resolution for chirp count (m/s), bounds: [0.2, 2.0]
+
+% 1.2 Transmit antenna separation in wavelengths (lambda)
 %   1.0 -> Overlapped array bracket
 %   4.0 -> Non-overlapped contiguous linear array bracket (default)
-dTx_lambda = 4.0;
+dTx_lambda = 4.0;               % Bounds: [1.0, 8.0]
 
-% Target count for automated peak locking and theoretical simulation (default: 2)
-targetCount = 2;
+% 1.3 FMCW range calibration offset and search interval
+calRange = 1.6;                 % Hardware range offset calibration (m), bounds: [0.0, 5.0]
+targetRangeMin = 0.5;           % Search gate minimum distance (m), bounds: [0.1, 10.0]
+targetRangeMax = 5.0;           % Search gate maximum distance (m), bounds: [0.5, 15.0]
+targetRangeGate = [targetRangeMin, targetRangeMax];
+portSwitchPause = 0.10;         % Switch settling time (s)
 
-% Spatial tapering / windowing across array elements
-spatialWindow = 'Uniform';   % Options: 'Uniform', 'Hann', 'Chebyshev'
-sllChebDb = -25;             % Sidelobe level for Chebyshev window (dB)
+% 1.4 Target count for automated peak locking and theoretical simulation
+targetCount = 2;                % Expected target count, bounds: [1, 5]
 
-% Tx phase calibration offset between out 1 and out 2 (degrees)
-tx_phase_cal = 0.0;
+% 1.5 Spatial tapering / windowing across array elements
+spatialWindow = 'Uniform';      % Options: 'Uniform', 'Hann', 'Chebyshev'
+sllChebDb = -25;                % Sidelobe level for Chebyshev window (dB), bounds: [-45, -15]
 
-% FMCW range calibration offset and search interval
-calRange = 1.6;              % Hardware range offset calibration (m)
-targetRangeGate = [0.5, 5.0];% Search interval for reflectors (calibrated m)
-portSwitchPause = 0.10;      % Switch settling time (s)
+% 1.6 Tx phase calibration offset between out 1 and out 2 (degrees)
+tx_phase_cal = 0.0;             % Bounds: [-180, 180] deg
 
-% System and radar parameters
-fc = 10e9;                   % Carrier frequency (10 GHz)
-c = physconst('LightSpeed'); % Speed of light (m/s)
-lambda = c / fc;             % Wavelength (0.03 m)
-maxRange = 10;               % Maximum instrumented range (m)
-rangeResolution = 0.1;       % Desired range resolution (m)
-maxSpeed = 5;                % Max speed for PRF selection (m/s)
-speedResolution = 1/2;       % Speed resolution for chirp count (m/s)
+% System constants and array geometry setup
+fc = 10e9;                      % Carrier frequency (10 GHz)
+c = physconst('LightSpeed');    % Speed of light (m/s)
+lambda = c / fc;                % Wavelength (0.03 m)
 
-% Array geometry setup
 nRxPhysical = 8;
 dRx = lambda / 2;
 dTx = dTx_lambda * lambda;
