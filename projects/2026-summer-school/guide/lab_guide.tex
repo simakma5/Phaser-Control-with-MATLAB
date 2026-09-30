@@ -48,7 +48,7 @@ Part & Activity \\
 In this project we apply time-division multiplexing (TDM) between Tx1 and Tx2 to realize a $2\times 8$ MIMO virtual array; the two transmit sweeps are electronically switched rather than hardware-synchronized, so the FMCW ramp start phase is not strictly identical between them, but for a stationary target this residual phase mismatch is small and its impact on the DoA estimate remains within acceptable error. Rather than grouping elements into subarrays, the ADALM-PHASER's eight physical receive patch antennas are individually measured using high-speed element-pair switching across the two ADAR1000 beamformer chips.
 
 \task{1.1}{Identify the available topology}
-Inspect the hardware and the measurement script (\texttt{helpers/mimo\_lab\_plain.m}). Draw a labelled diagram showing the two TX Vivaldi antennas and the eight-element RX array. Answer:
+Inspect the hardware and the measurement script (\texttt{mimo\_lab.mlx}). Draw a labelled diagram showing the two TX Vivaldi antennas and the eight-element RX array. Answer:
 \begin{enumerate}
 \item How many physical TX and RX channels are available, and how many virtual channels does their combination synthesize?
 \item What changes in terms of aperture length and angular resolution when only one TX is used?
@@ -115,14 +115,14 @@ Compare the virtual array topology and target response with the reference case (
 \section{PHASER measurements and polarimetric MIMO}
 
 \task{3.1}{Establish the measurement}
-Open the supplied Live Script (\texttt{mimo\_lab.mlx}, or its plain-text reference \texttt{helpers/mimo\_lab\_plain.m}). Start with both TX antennas aligned with the RX polarization (horizontal co-polarized) and place a single stationary corner reflector at a known distance and azimuth.
+Open the supplied Live Script (\texttt{mimo\_lab.mlx}). Start with both TX antennas aligned with the RX polarization (vertical co-polarized) and place a single stationary corner reflector at a known distance and azimuth.
 
 Configure the radar and processing controls in Section~1 of the script:
 \begin{enumerate}
 \item Set the TX antenna separation: \texttt{dTx\_lambda = 4.0} (corresponding to the $4\lambda$ contiguous ULA bracket).
+\item Calibrate the hardware range offset \texttt{calRange}: measure the raw peak distance of the known reflector and set $\texttt{calRange} = R_{\text{raw}} - R_{\text{true}}$ (default is 1.6~m).
 \item Set the range search gate: \texttt{targetRangeGate = [0.5, 5.0]} (m).
 \item Set the expected target count: \texttt{targetCount = 1}.
-\item Calibrate the hardware range offset \texttt{calRange}: measure the raw peak distance of the known reflector and set $\texttt{calRange} = R_{\text{raw}} - R_{\text{true}}$ (default is 1.6~m).
 \end{enumerate}
 
 Run the script and inspect \textbf{Figure~2} (\textit{Calibrated range profile}) and \textbf{Figure~1} (\textit{MIMO array geometry}). Verify that the detected target distance matches the physical position and that broadside azimuth alignment is centered near $0^\circ$.
@@ -141,9 +141,9 @@ Experiment with spatial windowing (\texttt{spatialWindow = 'Hann'} or \texttt{'C
 Explain any discrepancies between the ideal model and measurements using evidence from your data. Consider channel gain and phase errors, element mutual coupling, antenna beam patterns, finite target dimensions, specular reflection, laboratory multipath, and drift during sequential switching. Assess the far-field boundary ($2D^2/\lambda$) using the physical aperture and target size; if needed, compare exact TX--target--RX path lengths with the plane-wave model. Do not treat every reflector as an isotropic point scatterer or infer an absolute radar cross section from uncalibrated amplitudes.
 
 \task{3.3}{Change the transmitted polarization}
-Keep TX1 aligned with the RX polarization (horizontal). Rotate TX2 by $90^\circ$ about its boresight axis to make its linear polarization orthogonal (vertical), keeping its pointing direction unchanged.
+Keep TX1 aligned with the RX polarization (vertical). Rotate TX2 by $90^\circ$ about its boresight axis to make its linear polarization orthogonal (horizontal), keeping its pointing direction unchanged.
 
-Write down the polarization of each virtual channel: channels 1--8 (TX1 $\to$ RX) probe the co-polarized return ($S_{HH}$), while channels 9--16 (TX2 $\to$ RX) probe the cross-polarized return ($S_{HV}$).
+Write down the polarization of each virtual channel: channels 1--8 (TX1 $\to$ RX) probe the co-polarized return ($S_{VV}$), while channels 9--16 (TX2 $\to$ RX) probe the cross-polarized return ($S_{VH}$).
 
 Place the trihedral and dihedral corner reflectors in the scene at distinct distances and azimuth angles, and perform measurements for:
 \begin{enumerate}
@@ -164,14 +164,14 @@ Inspect \textbf{Figure~5} (\textit{Range profiles by transmit channel}) and \tex
 Use the convention that the first subscript denotes receive polarization and
 the second denotes transmit polarization:
 \[
-\begin{bmatrix}E_H^{\mathrm{rx}}\\E_V^{\mathrm{rx}}\end{bmatrix}
-=\underbrace{\begin{bmatrix}S_{HH}&S_{HV}\\S_{VH}&S_{VV}\end{bmatrix}}_{\mathbf S}
-\begin{bmatrix}E_H^{\mathrm{tx}}\\E_V^{\mathrm{tx}}\end{bmatrix}.
+  \begin{bmatrix}E_\mathrm{H}^{\mathrm{rx}}\\E_\mathrm{V}^{\mathrm{rx}}\end{bmatrix}
+=\underbrace{\begin{bmatrix}S_\mathrm{HH}&S_\mathrm{HV}\\S_\mathrm{VH}&S_\mathrm{VV}\end{bmatrix}}_{\mathbf S}
+\begin{bmatrix}E_\mathrm{H}^{\mathrm{tx}}\\E_\mathrm{V}^{\mathrm{tx}}\end{bmatrix}.
 \]
-For fixed H-polarized RX elements, H- and V-polarized TX antennas probe
-$S_{HH}$ and $S_{HV}$, respectively. If the RX polarization is V, the accessible
-terms are $S_{VH}$ and $S_{VV}$. Define H and V consistently for the actual setup.
-Changing TX polarization alone does not measure the full scattering matrix.
+For fixed V-polarized RX elements, V- and H-polarized TX antennas probe
+$S_\mathrm{VV}$ and $S_\mathrm{VH}$, respectively. If the RX polarization were H, the accessible
+terms would be $S_\mathrm{HV}$ and $S_\mathrm{HH}$. Define V and H consistently for the actual setup.
+Changing TX polarization alone does not measure the ful:withl scattering matrix.
 
 For ideal, suitably aligned reflectors in the monostatic backscatter convention,
 the following normalized matrices provide a qualitative reference, up to a
@@ -194,7 +194,7 @@ In a consistent choice of roll sign,
 
 \begin{figure}[h!]
     \centering
-    \includegraphics[width=.5\linewidth]{DH_model_00_45_90.png}
+    \includegraphics[width=.8\linewidth]{src/dihedral_model_00_45_90.png}
     \caption{Dihedral self-rotation ($\theta_r$).}
     \label{fig:DH_self_rotate}
     %\vspace{-3mm}
